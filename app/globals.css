@@ -1,0 +1,53 @@
+@import url("https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-display: "Fraunces", Georgia, serif;
+  --font-body: "Inter", Helvetica, Arial, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  background-color: #080d17;
+  color: #e9edf5;
+}
+
+::selection {
+  background: rgba(201, 161, 90, 0.35);
+  color: #fff;
+}
+
+/* Discreet custom scrollbar for the table */
+.cac-scroll::-webkit-scrollbar {
+  height: 8px;
+  width: 8px;
+}
+.cac-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.cac-scroll::-webkit-scrollbar-thumb {
+  background: #1c2c48;
+  border-radius: 4px;
+}
+.cac-scroll::-webkit-scrollbar-thumb:hover {
+  background: #2a3d61;
+}
+
+/* Tabular numerals everywhere numbers are shown */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-scroll-left,
+  .animate-blink-slow {
+    animation: none !important;
+  }
+}
