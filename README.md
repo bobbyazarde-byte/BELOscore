@@ -8,6 +8,14 @@ et **Tailwind CSS**, sans base de données ni clé d'API à configurer.
 **Fonctionnalités :**
 - Tableau triable/filtrable des 40 valeurs, avec bandeau défilant
 - Mini-graphique (sparkline) de tendance sur 1 mois pour chaque valeur
+- **Score technique (S/A/B/C/D/F)** inspiré des plateformes de notation
+  boursière type MINA : combine performance 1 mois et position dans la
+  fourchette 52 semaines. C'est un indicateur purement technique basé sur
+  les cours (aucune donnée fondamentale/comptable disponible via l'API
+  gratuite utilisée) — méthodologie affichée en toute transparence sur
+  chaque page de détail.
+- **Favoris ★** : marque des valeurs en favori (persistant dans le
+  navigateur via localStorage) et filtre le tableau dessus
 - Page détail par valeur (clic sur son nom) : graphique interactif
   (5 jours à 5 ans) avec survol, plus haut/bas jour et 52 semaines, volume
 - Comparateur : sélectionne jusqu'à 3 valeurs dans le tableau (cases à
@@ -78,8 +86,11 @@ components/
   Sparkline.tsx          → mini-graphique de tendance dans le tableau
   LineChart.tsx           → graphique détaillé (page valeur)
   ComparisonChart.tsx      → graphique superposé (comparateur)
+  ScoreBadge.tsx            → badge visuel du score technique (lettre)
 lib/
   tickers.ts                → liste des 40 valeurs (nom, ticker, secteur)
+  score.ts                    → calcul du score technique S/A/B/C/D/F
+  useFavoris.ts                 → hook favoris (localStorage)
 ```
 
 ## Ajuster la composition du CAC 40

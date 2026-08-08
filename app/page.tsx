@@ -6,6 +6,9 @@ import { CAC40, SECTEURS, Secteur } from "@/lib/tickers";
 import { Cotation } from "@/app/api/quotes/route";
 import TickerTape from "@/components/TickerTape";
 import Sparkline from "@/components/Sparkline";
+import ScoreBadge from "@/components/ScoreBadge";
+import { calculerScore } from "@/lib/score";
+import { useFavoris } from "@/lib/useFavoris";
 
 const MAX_COMPARATEUR = 3;
 
@@ -14,6 +17,7 @@ type Colonne =
   | "secteur"
   | "prix"
   | "variationPct"
+  | "score"
   | "volume"
   | "plusHautJour"
   | "plusBasJour";
@@ -24,6 +28,7 @@ interface Ligne {
   mnemo: string;
   secteur: Secteur;
   cotation?: Cotation;
+  score: ReturnType<typeof calculerScore>;
 }
 
 const ETATS: Record<string, string> = {
@@ -63,6 +68,8 @@ export default function Page() {
     sens: 1,
   });
   const [comparateur, setComparateur] = useState<string[]>([]);
+  const [favorisUniquement, setFavorisUniquement] = useState(false);
+  const { estFavori, basculer: basculerFavori, pret: favorisPrets } = useFavoris();
 
   const basculerComparateur = (ticker: string) => {
     setComparateur((prev) => {
@@ -102,13 +109,22 @@ export default function Page() {
 
   const lignes: Ligne[] = useMemo(
     () =>
-      CAC40.map((v) => ({
-        nom: v.nom,
-        ticker: v.ticker,
-        mnemo: v.mnemo,
-        secteur: v.secteur,
-        cotation: cotations[v.ticker],
-      })),
+      CAC40.map((v) => {
+        const cotation = cotations[v.ticker];
+        return {
+          nom: v.nom,
+          ticker: v.ticker,
+          mnemo: v.mnemo,
+          secteur: v.secteur,
+          cotation,
+          score: calculerScore({
+            prix: cotation?.prix ?? null,
+            plusHaut52s: cotation?.plusHaut52s ?? null,
+            plusBas52s: cotation?.plusBas52s ?? null,
+            historique: cotation?.historique ?? null,
+          }),
+        };
+      }),
     [cotations]
   );
 
@@ -121,13 +137,22 @@ export default function Page() {
         l.mnemo.toLowerCase().includes(q) ||
         l.ticker.toLowerCase().includes(q);
       const matchSecteur = secteur === "Tous" || l.secteur === secteur;
-      return matchTexte && matchSecteur;
+      const matchFavori = !favorisUniquement || estFavori(l.ticker);
+      return matchTexte && matchSecteur && matchFavori;
     });
 
     res = res.sort((a, b) => {
       const { colonne, sens } = tri;
       if (colonne === "nom" || colonne === "secteur") {
         return sens * a[colonne].localeCompare(b[colonne], "fr");
+      }
+      if (colonne === "score") {
+        const va = a.score?.valeur ?? null;
+        const vb = b.score?.valeur ?? null;
+        if (va === null && vb === null) return 0;
+        if (va === null) return 1;
+        if (vb === null) return -1;
+        return sens * (va - vb);
       }
       const va = a.cotation?.[colonne] ?? null;
       const vb = b.cotation?.[colonne] ?? null;
@@ -138,7 +163,7 @@ export default function Page() {
     });
 
     return res;
-  }, [lignes, recherche, secteur, tri]);
+  }, [lignes, recherche, secteur, favorisUniquement, estFavori, tri]);
 
   const basculerTri = (colonne: Colonne) => {
     setTri((prev) =>
@@ -242,6 +267,18 @@ export default function Page() {
                 </option>
               ))}
             </select>
+
+            <button
+              onClick={() => setFavorisUniquement((v) => !v)}
+              className={`inline-flex items-center justify-center gap-1.5 rounded-md border px-3 py-2 text-sm font-medium transition ${
+                favorisUniquement
+                  ? "border-bourse-or/50 bg-bourse-or/10 text-bourse-orclair"
+                  : "border-bourse-ligne text-bourse-brumeclair hover:text-bourse-texte"
+              }`}
+            >
+              <span>{favorisUniquement ? "★" : "☆"}</span>
+              Favoris
+            </button>
           </div>
 
           <button
@@ -261,9 +298,12 @@ export default function Page() {
 
         {/* Tableau */}
         <div className="cac-scroll overflow-x-auto rounded-lg border border-bourse-ligne bg-bourse-panel/60">
-          <table className="w-full min-w-[860px] border-collapse">
+          <table className="w-full min-w-[1080px] border-collapse">
             <thead>
               <tr className="border-b border-bourse-ligne">
+                <th className="w-9 px-3 py-2.5">
+                  <span className="sr-only">Favori</span>
+                </th>
                 <th className="w-9 px-3 py-2.5">
                   <span className="sr-only">Comparer</span>
                 </th>
@@ -271,6 +311,7 @@ export default function Page() {
                 {enTeteTri("secteur", "Secteur")}
                 {enTeteTri("prix", "Cours", true)}
                 {enTeteTri("variationPct", "Var. jour", true)}
+                {enTeteTri("score", "Score", true)}
                 <th className="px-3 py-2.5 text-right text-xs font-medium uppercase tracking-wider text-bourse-brumeclair">
                   Tendance 1 mois
                 </th>
@@ -283,14 +324,14 @@ export default function Page() {
               {chargement && lignesFiltrees.every((l) => !l.cotation) ? (
                 Array.from({ length: 12 }).map((_, i) => (
                   <tr key={i} className="border-b border-bourse-ligne/60">
-                    <td colSpan={9} className="px-3 py-3">
+                    <td colSpan={11} className="px-3 py-3">
                       <div className="h-4 w-full animate-pulse rounded bg-bourse-ligne/60" />
                     </td>
                   </tr>
                 ))
               ) : lignesFiltrees.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-3 py-10 text-center text-sm text-bourse-brumeclair">
+                  <td colSpan={11} className="px-3 py-10 text-center text-sm text-bourse-brumeclair">
                     Aucune valeur ne correspond à votre recherche.
                   </td>
                 </tr>
@@ -306,6 +347,24 @@ export default function Page() {
                       key={l.ticker}
                       className="border-b border-bourse-ligne/60 transition hover:bg-bourse-ligne/20"
                     >
+                      <td className="px-3 py-3">
+                        <button
+                          onClick={() => basculerFavori(l.ticker)}
+                          disabled={!favorisPrets}
+                          aria-label={
+                            estFavori(l.ticker)
+                              ? `Retirer ${l.nom} des favoris`
+                              : `Ajouter ${l.nom} aux favoris`
+                          }
+                          className={`text-base leading-none transition ${
+                            estFavori(l.ticker)
+                              ? "text-bourse-or"
+                              : "text-bourse-ligne hover:text-bourse-brumeclair"
+                          }`}
+                        >
+                          {estFavori(l.ticker) ? "★" : "☆"}
+                        </button>
+                      </td>
                       <td className="px-3 py-3">
                         <input
                           type="checkbox"
@@ -354,6 +413,11 @@ export default function Page() {
                       </td>
                       <td className="px-3 py-3">
                         <div className="flex justify-end">
+                          <ScoreBadge lettre={l.score?.lettre ?? null} />
+                        </div>
+                      </td>
+                      <td className="px-3 py-3">
+                        <div className="flex justify-end">
                           <Sparkline valeurs={c?.historique ?? null} />
                         </div>
                       </td>
@@ -379,6 +443,13 @@ export default function Page() {
           affichée{lignesFiltrees.length > 1 ? "s" : ""} sur {CAC40.length}. Données
           fournies par Yahoo Finance, à titre informatif uniquement — ne
           constitue pas un conseil en investissement.
+        </p>
+        <p className="mt-1 text-xs text-bourse-brume">
+          Le <span className="text-bourse-brumeclair">Score</span> (S à F) est un
+          indicateur purement technique — 50% performance sur 1 mois, 50%
+          position dans la fourchette 52 semaines — calculé uniquement à
+          partir des cours, sans donnée fondamentale (pas de ratios
+          financiers). Les favoris ★ sont enregistrés dans ce navigateur.
         </p>
       </div>
 
