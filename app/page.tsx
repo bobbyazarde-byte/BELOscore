@@ -438,8 +438,11 @@ export default function Page() {
           50% approche value (rendement des bénéfices, du cash-flow libre,
           VE/EBITDA, P/B) et 50% approche qualité (ROE, ROA, marges, dette
           nette/EBITDA, croissance du chiffre d&rsquo;affaires), à partir des
-          données fondamentales Yahoo Finance. Détail complet sur la page de
-          chaque valeur. Les favoris ★ sont enregistrés dans ce navigateur.
+          données fondamentales Yahoo Finance. Un score n&rsquo;est affiché que
+          si au moins 2 métriques sont disponibles par approche — sinon
+          « — », plutôt qu&rsquo;une note peu fiable basée sur une seule
+          donnée. Détail complet sur la page de chaque valeur. Les favoris
+          ★ sont enregistrés dans ce navigateur.
         </p>
       </div>
 

@@ -32,12 +32,15 @@ function ComparateurContenu() {
   const [scores, setScores] = useState<Record<string, ScoreVQ | null>>({});
   const [chargement, setChargement] = useState(false);
 
+  const [urlPrete, setUrlPrete] = useState(false);
+
   // Initialise la sélection depuis l'URL (?t=TICK1,TICK2)
   useEffect(() => {
     const t = params.get("t");
     if (t) {
       setTickers(t.split(",").map(decodeURIComponent).slice(0, MAX));
     }
+    setUrlPrete(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -49,22 +52,24 @@ function ComparateurContenu() {
     [router]
   );
 
+  // Synchronise l'URL avec la sélection courante — séparé de la mise à jour
+  // d'état elle-même pour ne jamais déclencher de navigation depuis
+  // l'intérieur d'un updater de setState (React l'interdit).
+  useEffect(() => {
+    if (!urlPrete) return;
+    mettreAJourUrl(tickers);
+  }, [tickers, urlPrete, mettreAJourUrl]);
+
   const ajouter = (ticker: string) => {
     setTickers((prev) => {
       if (prev.includes(ticker) || prev.length >= MAX) return prev;
-      const next = [...prev, ticker];
-      mettreAJourUrl(next);
-      return next;
+      return [...prev, ticker];
     });
     setRecherche("");
   };
 
   const retirer = (ticker: string) => {
-    setTickers((prev) => {
-      const next = prev.filter((t) => t !== ticker);
-      mettreAJourUrl(next);
-      return next;
-    });
+    setTickers((prev) => prev.filter((t) => t !== ticker));
   };
 
   // Points du graphique : dépendent de la période choisie.

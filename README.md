@@ -3,17 +3,17 @@
 Screener des 40 valeurs de l'indice CAC 40 avec un **score Value/Qualité**
 (S à F) inspiré des plateformes de notation boursière, cours en temps
 différé, filtrable par secteur, avec comparateur et page détail par valeur.
-Construit avec **Next.js 15** (App Router) et **Tailwind CSS**, sans base de
-données à gérer.
+Construit avec **Next.js 16** (App Router, Turbopack) et **Tailwind CSS**,
+sans base de données à gérer.
 
 ⚠️ Données à titre informatif uniquement — ce projet ne constitue pas un
 conseil en investissement.
 
-**Note sur les versions :** ce projet utilise Next.js 15.x (branche
-activement corrigée jusqu'en octobre 2026) plutôt que Next.js 14, dont le
-support est terminé depuis le 26 octobre 2025 (plus aucun correctif de
-sécurité, même pour des failles découvertes après cette date). Gardez
-`next` à jour avec `npm outdated` / `npm update` de temps en temps.
+**Note sur les versions :** ce projet utilise Next.js 16.x, la branche
+actuellement en support actif (« Active LTS »), plutôt que Next.js 14 dont
+le support est terminé depuis le 26 octobre 2025. Gardez `next` à jour de
+temps en temps avec `npm outdated` / `npm update`, et vérifiez
+régulièrement avec `npm audit`.
 
 ## Fonctionnalités
 
@@ -49,7 +49,7 @@ sécurité, même pour des failles découvertes après cette date). Gardez
 
 ## Lancer le projet en local
 
-Prérequis : [Node.js](https://nodejs.org) 18.18 ou plus récent (20+ recommandé).
+Prérequis : [Node.js](https://nodejs.org) 20.9 ou plus récent (requis par Next.js 16).
 
 ```bash
 npm install

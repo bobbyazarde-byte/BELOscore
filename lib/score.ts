@@ -146,8 +146,13 @@ export function calculerScoreVQ(f: Fondamentaux | null): ScoreVQ | null {
     scoresQuality.push(normaliserDecroissant(f.detteNetteEbitda, 0, 5));
   if (f.croissanceCA !== null) scoresQuality.push(normaliserCroissant(f.croissanceCA, -5, 15));
 
-  const scoreValue = moyenne(scoresValue);
-  const scoreQuality = moyenne(scoresQuality);
+  // Une seule métrique disponible ne suffit pas à établir un score fiable
+  // pour toute une catégorie (elle pourrait, à elle seule, pousser le score
+  // à 100/100 alors que le reste des données est simplement indisponible).
+  // On exige au moins 2 métriques calculables par catégorie.
+  const COUVERTURE_MIN = 2;
+  const scoreValue = scoresValue.length >= COUVERTURE_MIN ? moyenne(scoresValue) : null;
+  const scoreQuality = scoresQuality.length >= COUVERTURE_MIN ? moyenne(scoresQuality) : null;
 
   if (scoreValue === null && scoreQuality === null) return null;
 

@@ -126,6 +126,15 @@ export default function PageValeur() {
 
   const hausse = (cotation?.variationPct ?? 0) >= 0;
 
+  const performancePeriode = (() => {
+    const pts = points?.points;
+    if (!pts || pts.length < 2) return null;
+    const debut = pts[0].cloture;
+    const fin = pts[pts.length - 1].cloture;
+    if (!debut) return null;
+    return ((fin - debut) / debut) * 100;
+  })();
+
   return (
     <main className="min-h-screen pb-16">
       <div className="mx-auto max-w-4xl px-5 pt-10 sm:px-8">
@@ -183,21 +192,37 @@ export default function PageValeur() {
           </div>
         )}
 
-        {/* Sélecteur de période */}
-        <div className="mb-4 flex flex-wrap gap-2">
-          {PLAGES.map((p) => (
-            <button
-              key={p.valeur}
-              onClick={() => setPlage(p.valeur)}
-              className={`rounded-md border px-3 py-1.5 text-xs font-medium transition ${
-                plage === p.valeur
-                  ? "border-bourse-or/50 bg-bourse-or/10 text-bourse-orclair"
-                  : "border-bourse-ligne text-bourse-brumeclair hover:text-bourse-texte"
+        {/* Sélecteur de période + performance sur la période affichée */}
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap gap-2">
+            {PLAGES.map((p) => (
+              <button
+                key={p.valeur}
+                onClick={() => setPlage(p.valeur)}
+                className={`rounded-md border px-3 py-1.5 text-xs font-medium transition ${
+                  plage === p.valeur
+                    ? "border-bourse-or/50 bg-bourse-or/10 text-bourse-orclair"
+                    : "border-bourse-ligne text-bourse-brumeclair hover:text-bourse-texte"
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+
+          {!chargementGraphique && performancePeriode !== null && (
+            <span
+              className={`font-mono text-sm tabular ${
+                performancePeriode >= 0 ? "text-bourse-hausse" : "text-bourse-baisse"
               }`}
             >
-              {p.label}
-            </button>
-          ))}
+              {performancePeriode >= 0 ? "▲" : "▼"} {performancePeriode >= 0 ? "+" : ""}
+              {performancePeriode.toFixed(2)}%{" "}
+              <span className="text-bourse-brumeclair">
+                sur {(PLAGES.find((p) => p.valeur === plage)?.label ?? "la période").toLowerCase()}
+              </span>
+            </span>
+          )}
         </div>
 
         {/* Graphique */}
@@ -254,8 +279,10 @@ export default function PageValeur() {
           Score = 50% approche value (rendement des bénéfices, du cash-flow
           libre, VE/EBITDA, P/B) + 50% approche qualité (ROE, ROA, marge
           opérationnelle, dette nette/EBITDA, croissance du chiffre
-          d&rsquo;affaires). Seuils indicatifs, à but pédagogique — ne
-          constitue pas un conseil en investissement.
+          d&rsquo;affaires). Un score n&rsquo;est calculé que si au moins 2
+          métriques sont disponibles par approche, pour éviter qu&rsquo;une
+          seule donnée isolée fausse la note. Seuils indicatifs, à but
+          pédagogique — ne constitue pas un conseil en investissement.
         </p>
 
         <div>
