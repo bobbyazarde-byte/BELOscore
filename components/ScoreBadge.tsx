@@ -21,7 +21,7 @@ export default function ScoreBadge({
     <span
       className={`inline-flex ${classesTaille} items-center justify-center rounded-md border font-display font-semibold italic`}
       style={{ color: c.texte, backgroundColor: c.fond, borderColor: c.bordure }}
-      title="Score technique (voir méthodologie)"
+      title="Score Value/Qualité (voir méthodologie)"
     >
       {lettre}
     </span>

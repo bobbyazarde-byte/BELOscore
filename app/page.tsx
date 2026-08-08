@@ -7,7 +7,6 @@ import { Cotation } from "@/app/api/quotes/route";
 import TickerTape from "@/components/TickerTape";
 import Sparkline from "@/components/Sparkline";
 import ScoreBadge from "@/components/ScoreBadge";
-import { calculerScore } from "@/lib/score";
 import { useFavoris } from "@/lib/useFavoris";
 
 const MAX_COMPARATEUR = 3;
@@ -28,7 +27,6 @@ interface Ligne {
   mnemo: string;
   secteur: Secteur;
   cotation?: Cotation;
-  score: ReturnType<typeof calculerScore>;
 }
 
 const ETATS: Record<string, string> = {
@@ -109,22 +107,13 @@ export default function Page() {
 
   const lignes: Ligne[] = useMemo(
     () =>
-      CAC40.map((v) => {
-        const cotation = cotations[v.ticker];
-        return {
-          nom: v.nom,
-          ticker: v.ticker,
-          mnemo: v.mnemo,
-          secteur: v.secteur,
-          cotation,
-          score: calculerScore({
-            prix: cotation?.prix ?? null,
-            plusHaut52s: cotation?.plusHaut52s ?? null,
-            plusBas52s: cotation?.plusBas52s ?? null,
-            historique: cotation?.historique ?? null,
-          }),
-        };
-      }),
+      CAC40.map((v) => ({
+        nom: v.nom,
+        ticker: v.ticker,
+        mnemo: v.mnemo,
+        secteur: v.secteur,
+        cotation: cotations[v.ticker],
+      })),
     [cotations]
   );
 
@@ -147,8 +136,8 @@ export default function Page() {
         return sens * a[colonne].localeCompare(b[colonne], "fr");
       }
       if (colonne === "score") {
-        const va = a.score?.valeur ?? null;
-        const vb = b.score?.valeur ?? null;
+        const va = a.cotation?.score?.valeur ?? null;
+        const vb = b.cotation?.score?.valeur ?? null;
         if (va === null && vb === null) return 0;
         if (va === null) return 1;
         if (vb === null) return -1;
@@ -208,7 +197,7 @@ export default function Page() {
               Place de Paris · Euronext
             </div>
             <h1 className="font-display text-4xl font-medium italic text-bourse-texte sm:text-5xl">
-              La Criée
+              BELOSCORE
             </h1>
             <p className="mt-2 max-w-md text-sm text-bourse-brumeclair">
               Screener des 40 valeurs de l&rsquo;indice CAC 40, cours en temps
@@ -413,7 +402,7 @@ export default function Page() {
                       </td>
                       <td className="px-3 py-3">
                         <div className="flex justify-end">
-                          <ScoreBadge lettre={l.score?.lettre ?? null} />
+                          <ScoreBadge lettre={c?.score?.lettre ?? null} />
                         </div>
                       </td>
                       <td className="px-3 py-3">
@@ -445,11 +434,12 @@ export default function Page() {
           constitue pas un conseil en investissement.
         </p>
         <p className="mt-1 text-xs text-bourse-brume">
-          Le <span className="text-bourse-brumeclair">Score</span> (S à F) est un
-          indicateur purement technique — 50% performance sur 1 mois, 50%
-          position dans la fourchette 52 semaines — calculé uniquement à
-          partir des cours, sans donnée fondamentale (pas de ratios
-          financiers). Les favoris ★ sont enregistrés dans ce navigateur.
+          Le <span className="text-bourse-brumeclair">Score</span> (S à F) combine
+          50% approche value (rendement des bénéfices, du cash-flow libre,
+          VE/EBITDA, P/B) et 50% approche qualité (ROE, ROA, marges, dette
+          nette/EBITDA, croissance du chiffre d&rsquo;affaires), à partir des
+          données fondamentales Yahoo Finance. Détail complet sur la page de
+          chaque valeur. Les favoris ★ sont enregistrés dans ce navigateur.
         </p>
       </div>
 

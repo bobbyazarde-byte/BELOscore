@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Criée — Screener CAC 40",
+  title: "BELOSCORE — Screener CAC 40",
   description:
-    "Screener en temps différé des 40 valeurs du CAC 40 : cours, variation, volume et plus, filtrable par secteur.",
+    "Screener des 40 valeurs du CAC 40 avec score Value/Qualité, cours en temps différé, filtrable par secteur.",
 };
 
 export default function RootLayout({

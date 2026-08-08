@@ -4,19 +4,13 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { CAC40 } from "@/lib/tickers";
+import { PLAGES } from "@/lib/plages";
 import LineChart from "@/components/LineChart";
 import ScoreBadge from "@/components/ScoreBadge";
-import { calculerScore } from "@/lib/score";
 import { useFavoris } from "@/lib/useFavoris";
 import { DetailValeur } from "@/app/api/historique/[ticker]/route";
-
-const PLAGES: { valeur: string; label: string }[] = [
-  { valeur: "5d", label: "5 jours" },
-  { valeur: "1mo", label: "1 mois" },
-  { valeur: "6mo", label: "6 mois" },
-  { valeur: "1y", label: "1 an" },
-  { valeur: "5y", label: "5 ans" },
-];
+import { CotationBase } from "@/lib/yahooChart";
+import { ScoreVQ, Metrique } from "@/lib/score";
 
 function formatPrix(n: number | null | undefined, devise?: string | null) {
   if (n === null || n === undefined) return "—";
@@ -31,64 +25,106 @@ function formatVolume(n: number | null | undefined) {
   return `${n}`;
 }
 
+function formatMetrique(m: Metrique) {
+  if (m.valeur === null) return "—";
+  return m.unite === "%" ? `${m.valeur.toFixed(2)}%` : `${m.valeur.toFixed(2)}x`;
+}
+
+function BlocMetriques({ titre, score, metriques }: { titre: string; score: number | null; metriques: Metrique[] }) {
+  return (
+    <div className="rounded-lg border border-bourse-ligne bg-bourse-panel/60 p-4">
+      <div className="mb-3 flex items-center justify-between">
+        <h3 className="font-display text-lg italic text-bourse-texte">{titre}</h3>
+        <span className="font-mono text-sm tabular text-bourse-brumeclair">
+          {score !== null ? `${score}/100` : "—"}
+        </span>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        {metriques.map((m) => (
+          <div key={m.cle} className="rounded-md border border-bourse-ligne/70 bg-bourse-nuit/50 p-3">
+            <div className="text-[11px] uppercase tracking-wider text-bourse-brumeclair">{m.label}</div>
+            <div
+              className={`mt-1 font-mono text-lg tabular ${
+                m.favorable === null
+                  ? "text-bourse-brume"
+                  : m.favorable
+                  ? "text-bourse-hausse"
+                  : "text-bourse-baisse"
+              }`}
+            >
+              {formatMetrique(m)}
+            </div>
+            <div className="mt-0.5 text-[11px] text-bourse-brume">{m.seuil}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function PageValeur() {
   const params = useParams<{ ticker: string }>();
   const router = useRouter();
   const ticker = decodeURIComponent(params.ticker);
   const valeur = CAC40.find((v) => v.ticker === ticker);
 
-  const [plage, setPlage] = useState("6mo");
-  const [detail, setDetail] = useState<DetailValeur | null>(null);
-  const [chargement, setChargement] = useState(true);
+  const [plage, setPlage] = useState("1y");
+  const [points, setPoints] = useState<DetailValeur | null>(null);
+  const [cotation, setCotation] = useState<CotationBase | null>(null);
+  const [score, setScore] = useState<ScoreVQ | null>(null);
+  const [chargementGraphique, setChargementGraphique] = useState(true);
+  const [chargementFiche, setChargementFiche] = useState(true);
   const [erreur, setErreur] = useState(false);
-  const [historique1Mois, setHistorique1Mois] = useState<number[] | null>(null);
   const { estFavori, basculer: basculerFavori, pret: favorisPrets } = useFavoris();
 
-  const charger = useCallback(async () => {
-    setChargement(true);
-    setErreur(false);
+  const chargerGraphique = useCallback(async () => {
+    setChargementGraphique(true);
     try {
       const res = await fetch(
         `/api/historique/${encodeURIComponent(ticker)}?range=${plage}`,
         { cache: "no-store" }
       );
       const data = (await res.json()) as DetailValeur;
-      setDetail(data);
-      if (data.erreur) setErreur(true);
+      setPoints(data);
     } catch {
-      setErreur(true);
+      setPoints(null);
     } finally {
-      setChargement(false);
+      setChargementGraphique(false);
     }
   }, [ticker, plage]);
 
   useEffect(() => {
-    charger();
-  }, [charger]);
+    chargerGraphique();
+  }, [chargerGraphique]);
 
   useEffect(() => {
     let annule = false;
-    fetch(`/api/historique/${encodeURIComponent(ticker)}?range=1mo`, { cache: "no-store" })
-      .then((res) => res.json())
-      .then((data: DetailValeur) => {
-        if (!annule) setHistorique1Mois(data.points.map((p) => p.cloture));
+    setChargementFiche(true);
+    setErreur(false);
+
+    Promise.all([
+      fetch(`/api/cotation/${encodeURIComponent(ticker)}`, { cache: "no-store" }).then((r) => r.json()),
+      fetch(`/api/fondamentaux/${encodeURIComponent(ticker)}`, { cache: "no-store" }).then((r) => r.json()),
+    ])
+      .then(([cot, fond]) => {
+        if (annule) return;
+        setCotation(cot as CotationBase);
+        setScore((fond?.score as ScoreVQ) ?? null);
+        if (cot?.erreur) setErreur(true);
       })
       .catch(() => {
-        if (!annule) setHistorique1Mois(null);
+        if (!annule) setErreur(true);
+      })
+      .finally(() => {
+        if (!annule) setChargementFiche(false);
       });
+
     return () => {
       annule = true;
     };
   }, [ticker]);
 
-  const score = calculerScore({
-    prix: detail?.prix ?? null,
-    plusHaut52s: detail?.plusHaut52s ?? null,
-    plusBas52s: detail?.plusBas52s ?? null,
-    historique: historique1Mois,
-  });
-
-  const hausse = (detail?.variationPct ?? 0) >= 0;
+  const hausse = (cotation?.variationPct ?? 0) >= 0;
 
   return (
     <main className="min-h-screen pb-16">
@@ -116,7 +152,7 @@ export default function PageValeur() {
               {valeur?.secteur ?? "Valeur"} · {valeur?.mnemo ?? ticker}
             </div>
             <h1 className="font-display text-3xl font-medium italic text-bourse-texte sm:text-4xl">
-              {valeur?.nom ?? detail?.nom ?? ticker}
+              {valeur?.nom ?? cotation?.nom ?? ticker}
             </h1>
             <p className="mt-1 font-mono text-xs text-bourse-brume">{ticker}</p>
           </div>
@@ -124,18 +160,18 @@ export default function PageValeur() {
           <div className="flex flex-col items-start gap-1 sm:items-end">
             <div className="flex items-center gap-2">
               <span className="font-mono text-3xl tabular text-bourse-texte">
-                {chargement ? "—" : formatPrix(detail?.prix, detail?.devise)}
+                {chargementFiche ? "—" : formatPrix(cotation?.prix, cotation?.devise)}
               </span>
               <ScoreBadge lettre={score?.lettre ?? null} taille="lg" />
             </div>
-            {detail && detail.variationPct !== null && (
+            {cotation && cotation.variationPct !== null && (
               <span
                 className={`font-mono text-sm tabular ${
                   hausse ? "text-bourse-hausse" : "text-bourse-baisse"
                 }`}
               >
-                {hausse ? "▲" : "▼"} {detail.variation?.toFixed(2)} ({hausse ? "+" : ""}
-                {detail.variationPct.toFixed(2)}%)
+                {hausse ? "▲" : "▼"} {cotation.variation?.toFixed(2)} ({hausse ? "+" : ""}
+                {cotation.variationPct.toFixed(2)}%)
               </span>
             )}
           </div>
@@ -166,24 +202,24 @@ export default function PageValeur() {
 
         {/* Graphique */}
         <div className="mb-8 rounded-lg border border-bourse-ligne bg-bourse-panel/60 p-4">
-          {chargement ? (
+          {chargementGraphique ? (
             <div className="flex h-[260px] items-center justify-center text-sm text-bourse-brume">
               Chargement…
             </div>
           ) : (
-            <LineChart points={detail?.points ?? []} devise={detail?.devise} />
+            <LineChart points={points?.points ?? []} devise={points?.devise ?? cotation?.devise} />
           )}
         </div>
 
         {/* Statistiques */}
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <div className="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-4">
           {[
-            { label: "Plus haut du jour", val: formatPrix(detail?.plusHautJour, detail?.devise) },
-            { label: "Plus bas du jour", val: formatPrix(detail?.plusBasJour, detail?.devise) },
-            { label: "Plus haut (52 sem.)", val: formatPrix(detail?.plusHaut52s, detail?.devise) },
-            { label: "Plus bas (52 sem.)", val: formatPrix(detail?.plusBas52s, detail?.devise) },
-            { label: "Volume", val: formatVolume(detail?.volume) },
-            { label: "Clôture veille", val: formatPrix(detail?.clotureVeille, detail?.devise) },
+            { label: "Plus haut du jour", val: formatPrix(cotation?.plusHautJour, cotation?.devise) },
+            { label: "Plus bas du jour", val: formatPrix(cotation?.plusBasJour, cotation?.devise) },
+            { label: "Plus haut (52 sem.)", val: formatPrix(cotation?.plusHaut52s, cotation?.devise) },
+            { label: "Plus bas (52 sem.)", val: formatPrix(cotation?.plusBas52s, cotation?.devise) },
+            { label: "Volume", val: formatVolume(cotation?.volume) },
+            { label: "Clôture veille", val: formatPrix(cotation?.clotureVeille, cotation?.devise) },
             { label: "Secteur", val: valeur?.secteur ?? "—" },
             { label: "Code Euronext", val: valeur?.mnemo ?? "—" },
           ].map((s) => (
@@ -199,33 +235,30 @@ export default function PageValeur() {
           ))}
         </div>
 
-        {score && (
-          <div className="mt-6 rounded-lg border border-bourse-ligne bg-bourse-panel/60 p-4">
-            <div className="mb-2 flex items-center gap-2">
-              <ScoreBadge lettre={score.lettre} />
-              <span className="text-sm font-medium text-bourse-texte">
-                Score technique : {score.valeur}/100
-              </span>
-            </div>
-            <p className="text-xs text-bourse-brumeclair">
-              Performance 1 mois :{" "}
-              <span className="font-mono">
-                {score.momentum !== null
-                  ? `${score.momentum >= 0 ? "+" : ""}${score.momentum.toFixed(2)}%`
-                  : "—"}
-              </span>{" "}
-              · Position dans la fourchette 52 sem. :{" "}
-              <span className="font-mono">
-                {score.position52 !== null ? `${score.position52.toFixed(0)}%` : "—"}
-              </span>
-              . Indicateur purement technique basé sur les cours, sans donnée
-              fondamentale — à ne pas confondre avec un score de qualité
-              d&rsquo;entreprise.
-            </p>
+        {/* Détail du score Value/Qualité */}
+        {score ? (
+          <div className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-2">
+            <BlocMetriques titre="Approche Value" score={score.value.valeur} metriques={score.value.metriques} />
+            <BlocMetriques titre="Approche Qualité" score={score.quality.valeur} metriques={score.quality.metriques} />
           </div>
+        ) : (
+          !chargementFiche && (
+            <div className="mb-8 rounded-lg border border-bourse-ligne bg-bourse-panel/60 p-4 text-sm text-bourse-brumeclair">
+              Données fondamentales indisponibles pour cette valeur pour le moment — le score
+              Value/Qualité ne peut pas être calculé.
+            </div>
+          )
         )}
 
-        <div className="mt-8">
+        <p className="mb-8 text-xs text-bourse-brume">
+          Score = 50% approche value (rendement des bénéfices, du cash-flow
+          libre, VE/EBITDA, P/B) + 50% approche qualité (ROE, ROA, marge
+          opérationnelle, dette nette/EBITDA, croissance du chiffre
+          d&rsquo;affaires). Seuils indicatifs, à but pédagogique — ne
+          constitue pas un conseil en investissement.
+        </p>
+
+        <div>
           <Link
             href={`/comparateur?t=${encodeURIComponent(ticker)}`}
             className="inline-flex items-center gap-2 rounded-md border border-bourse-or/40 bg-bourse-or/10 px-4 py-2 text-sm font-medium text-bourse-orclair transition hover:bg-bourse-or/20"

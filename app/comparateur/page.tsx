@@ -4,18 +4,15 @@ import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { CAC40 } from "@/lib/tickers";
+import { PLAGES } from "@/lib/plages";
 import ComparisonChart from "@/components/ComparisonChart";
+import ScoreBadge from "@/components/ScoreBadge";
 import { DetailValeur } from "@/app/api/historique/[ticker]/route";
+import { CotationBase } from "@/lib/yahooChart";
+import { ScoreVQ } from "@/lib/score";
 
 const MAX = 3;
 const COULEURS = ["#C9A15A", "#3FB68B", "#7C9CE2"];
-
-const PLAGES: { valeur: string; label: string }[] = [
-  { valeur: "1mo", label: "1 mois" },
-  { valeur: "6mo", label: "6 mois" },
-  { valeur: "1y", label: "1 an" },
-  { valeur: "5y", label: "5 ans" },
-];
 
 function formatPrix(n: number | null | undefined, devise?: string | null) {
   if (n === null || n === undefined) return "—";
@@ -29,8 +26,10 @@ function ComparateurContenu() {
 
   const [tickers, setTickers] = useState<string[]>([]);
   const [recherche, setRecherche] = useState("");
-  const [plage, setPlage] = useState("6mo");
-  const [details, setDetails] = useState<Record<string, DetailValeur>>({});
+  const [plage, setPlage] = useState("1y");
+  const [points, setPoints] = useState<Record<string, DetailValeur>>({});
+  const [cotations, setCotations] = useState<Record<string, CotationBase>>({});
+  const [scores, setScores] = useState<Record<string, ScoreVQ | null>>({});
   const [chargement, setChargement] = useState(false);
 
   // Initialise la sélection depuis l'URL (?t=TICK1,TICK2)
@@ -68,6 +67,7 @@ function ComparateurContenu() {
     });
   };
 
+  // Points du graphique : dépendent de la période choisie.
   useEffect(() => {
     if (tickers.length === 0) return;
     setChargement(true);
@@ -83,10 +83,33 @@ function ComparateurContenu() {
       .then((results) => {
         const map: Record<string, DetailValeur> = {};
         results.forEach((r) => (map[r.ticker] = r));
-        setDetails(map);
+        setPoints(map);
       })
       .finally(() => setChargement(false));
   }, [tickers, plage]);
+
+  // Cotation + score : indépendants de la période du graphique.
+  useEffect(() => {
+    if (tickers.length === 0) return;
+    Promise.all(
+      tickers.map(async (t) => {
+        const [cot, fond] = await Promise.all([
+          fetch(`/api/cotation/${encodeURIComponent(t)}`, { cache: "no-store" }).then((r) => r.json()),
+          fetch(`/api/fondamentaux/${encodeURIComponent(t)}`, { cache: "no-store" }).then((r) => r.json()),
+        ]);
+        return { ticker: t, cot: cot as CotationBase, score: (fond?.score as ScoreVQ) ?? null };
+      })
+    ).then((results) => {
+      const mapCot: Record<string, CotationBase> = {};
+      const mapScore: Record<string, ScoreVQ | null> = {};
+      results.forEach((r) => {
+        mapCot[r.ticker] = r.cot;
+        mapScore[r.ticker] = r.score;
+      });
+      setCotations(mapCot);
+      setScores(mapScore);
+    });
+  }, [tickers]);
 
   const suggestions = useMemo(() => {
     const q = recherche.trim().toLowerCase();
@@ -100,7 +123,7 @@ function ComparateurContenu() {
 
   const series = tickers.map((t, i) => {
     const v = CAC40.find((x) => x.ticker === t);
-    const d = details[t];
+    const d = points[t];
     return {
       ticker: t,
       nom: v?.nom ?? t,
@@ -194,7 +217,7 @@ function ComparateurContenu() {
         ) : (
           <>
             <div className="mb-4 flex flex-wrap gap-2">
-              {PLAGES.map((p) => (
+              {PLAGES.filter((p) => p.valeur !== "1d").map((p) => (
                 <button
                   key={p.valeur}
                   onClick={() => setPlage(p.valeur)}
@@ -223,17 +246,29 @@ function ComparateurContenu() {
             <div className="cac-scroll overflow-x-auto rounded-lg border border-bourse-ligne bg-bourse-panel/60">
               <table className="w-full min-w-[480px] border-collapse">
                 <tbody>
+                  <tr className="border-b border-bourse-ligne/60">
+                    <td className="px-4 py-3 text-xs uppercase tracking-wider text-bourse-brumeclair">
+                      Score
+                    </td>
+                    {tickers.map((t) => (
+                      <td key={t} className="px-4 py-3 text-right">
+                        <div className="flex justify-end">
+                          <ScoreBadge lettre={scores[t]?.lettre ?? null} />
+                        </div>
+                      </td>
+                    ))}
+                  </tr>
                   {[
-                    { label: "Cours", get: (d?: DetailValeur) => formatPrix(d?.prix, d?.devise) },
+                    { label: "Cours", get: (d?: CotationBase) => formatPrix(d?.prix, d?.devise) },
                     {
                       label: "Variation jour",
-                      get: (d?: DetailValeur) =>
+                      get: (d?: CotationBase) =>
                         d && d.variationPct !== null
                           ? `${d.variationPct >= 0 ? "+" : ""}${d.variationPct.toFixed(2)}%`
                           : "—",
                     },
-                    { label: "Plus haut 52 sem.", get: (d?: DetailValeur) => formatPrix(d?.plusHaut52s, d?.devise) },
-                    { label: "Plus bas 52 sem.", get: (d?: DetailValeur) => formatPrix(d?.plusBas52s, d?.devise) },
+                    { label: "Plus haut 52 sem.", get: (d?: CotationBase) => formatPrix(d?.plusHaut52s, d?.devise) },
+                    { label: "Plus bas 52 sem.", get: (d?: CotationBase) => formatPrix(d?.plusBas52s, d?.devise) },
                   ].map((ligne) => (
                     <tr key={ligne.label} className="border-b border-bourse-ligne/60">
                       <td className="px-4 py-3 text-xs uppercase tracking-wider text-bourse-brumeclair">
@@ -244,7 +279,7 @@ function ComparateurContenu() {
                           key={t}
                           className="px-4 py-3 text-right font-mono text-sm tabular text-bourse-texte"
                         >
-                          {ligne.get(details[t])}
+                          {ligne.get(cotations[t])}
                         </td>
                       ))}
                     </tr>
