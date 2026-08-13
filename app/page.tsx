@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { CAC40, SECTEURS, Secteur } from "@/lib/tickers";
+import { UNIVERS, SECTEURS, Secteur } from "@/lib/tickers";
 import { Cotation } from "@/app/api/quotes/route";
 import TickerTape from "@/components/TickerTape";
 import Sparkline from "@/components/Sparkline";
@@ -100,14 +100,18 @@ export default function Page() {
 
   useEffect(() => {
     charger();
-    // Rafraîchissement automatique toutes les 90 secondes.
-    const id = setInterval(charger, 90_000);
+    // Rafraîchissement automatique toutes les 5 minutes — l'univers étant
+    // passé de 40 à ~120 valeurs (donc ~240 requêtes Yahoo par
+    // rafraîchissement), un intervalle plus long évite de solliciter
+    // Yahoo trop fréquemment. Le bouton "Actualiser" reste disponible
+    // pour un rafraîchissement manuel immédiat.
+    const id = setInterval(charger, 5 * 60_000);
     return () => clearInterval(id);
   }, [charger]);
 
   const lignes: Ligne[] = useMemo(
     () =>
-      CAC40.map((v) => ({
+      UNIVERS.map((v) => ({
         nom: v.nom,
         ticker: v.ticker,
         mnemo: v.mnemo,
@@ -200,8 +204,9 @@ export default function Page() {
               BELOSCORE
             </h1>
             <p className="mt-2 max-w-md text-sm text-bourse-brumeclair">
-              Screener des 40 valeurs de l&rsquo;indice CAC 40, cours en temps
-              différé fournis par Yahoo Finance.
+              Screener de l&rsquo;indice SBF 120 (CAC 40 + 80 valeurs
+              supplémentaires), cours en temps différé fournis par Yahoo
+              Finance.
             </p>
           </div>
 
@@ -429,20 +434,19 @@ export default function Page() {
 
         <p className="mt-4 text-xs text-bourse-brume">
           {lignesFiltrees.length} valeur{lignesFiltrees.length > 1 ? "s" : ""}{" "}
-          affichée{lignesFiltrees.length > 1 ? "s" : ""} sur {CAC40.length}. Données
+          affichée{lignesFiltrees.length > 1 ? "s" : ""} sur {UNIVERS.length}. Données
           fournies par Yahoo Finance, à titre informatif uniquement — ne
           constitue pas un conseil en investissement.
         </p>
         <p className="mt-1 text-xs text-bourse-brume">
-          Le <span className="text-bourse-brumeclair">Score</span> (S à F) combine
-          50% approche value (rendement des bénéfices, du cash-flow libre,
-          VE/EBITDA, P/B) et 50% approche qualité (ROE, ROA, marges, dette
-          nette/EBITDA, croissance du chiffre d&rsquo;affaires), à partir des
-          données fondamentales Yahoo Finance. Un score n&rsquo;est affiché que
-          si au moins 2 métriques sont disponibles par approche — sinon
-          « — », plutôt qu&rsquo;une note peu fiable basée sur une seule
-          donnée. Détail complet sur la page de chaque valeur. Les favoris
-          ★ sont enregistrés dans ce navigateur.
+          Le <span className="text-bourse-brumeclair">Score</span> (S à F) est réparti
+          sur 100 points en 4 catégories de 25 points chacune : Rentabilité,
+          Gestion, Croissance, Santé financière. Chaque métrique est notée
+          sur 5 paliers (Très faible à Très bon) selon des seuils fixes
+          définis par nos soins. Une catégorie n&rsquo;est notée que si au
+          moins 2 de ses métriques sont disponibles. Détail complet des 18
+          métriques sur la page de chaque valeur. Les favoris ★ sont
+          enregistrés dans ce navigateur.
         </p>
       </div>
 
@@ -455,7 +459,7 @@ export default function Page() {
                 Comparateur ({comparateur.length}/{MAX_COMPARATEUR})
               </span>
               {comparateur.map((t) => {
-                const v = CAC40.find((x) => x.ticker === t);
+                const v = UNIVERS.find((x) => x.ticker === t);
                 return (
                   <span
                     key={t}

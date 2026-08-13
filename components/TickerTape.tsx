@@ -1,7 +1,7 @@
 "use client";
 
 import { Cotation } from "@/app/api/quotes/route";
-import { CAC40 } from "@/lib/tickers";
+import { UNIVERS } from "@/lib/tickers";
 
 function formatPrix(n: number | null) {
   if (n === null) return "—";
@@ -12,7 +12,7 @@ export default function TickerTape({ quotes }: { quotes: Cotation[] }) {
   const items = quotes
     .filter((q) => !q.erreur)
     .map((q) => {
-      const valeur = CAC40.find((v) => v.ticker === q.ticker);
+      const valeur = UNIVERS.find((v) => v.ticker === q.ticker);
       return { ...q, mnemo: valeur?.mnemo ?? q.ticker };
     });
 

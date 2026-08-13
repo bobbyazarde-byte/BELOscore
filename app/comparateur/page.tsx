@@ -3,13 +3,13 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { CAC40 } from "@/lib/tickers";
+import { UNIVERS } from "@/lib/tickers";
 import { PLAGES } from "@/lib/plages";
 import ComparisonChart from "@/components/ComparisonChart";
 import ScoreBadge from "@/components/ScoreBadge";
 import { DetailValeur } from "@/app/api/historique/[ticker]/route";
 import { CotationBase } from "@/lib/yahooChart";
-import { ScoreVQ } from "@/lib/score";
+import { ScoreCategoriel } from "@/lib/scoreCategoriel";
 
 const MAX = 3;
 const COULEURS = ["#C9A15A", "#3FB68B", "#7C9CE2"];
@@ -29,7 +29,7 @@ function ComparateurContenu() {
   const [plage, setPlage] = useState("1y");
   const [points, setPoints] = useState<Record<string, DetailValeur>>({});
   const [cotations, setCotations] = useState<Record<string, CotationBase>>({});
-  const [scores, setScores] = useState<Record<string, ScoreVQ | null>>({});
+  const [scores, setScores] = useState<Record<string, ScoreCategoriel | null>>({});
   const [chargement, setChargement] = useState(false);
 
   const [urlPrete, setUrlPrete] = useState(false);
@@ -102,11 +102,11 @@ function ComparateurContenu() {
           fetch(`/api/cotation/${encodeURIComponent(t)}`, { cache: "no-store" }).then((r) => r.json()),
           fetch(`/api/fondamentaux/${encodeURIComponent(t)}`, { cache: "no-store" }).then((r) => r.json()),
         ]);
-        return { ticker: t, cot: cot as CotationBase, score: (fond?.score as ScoreVQ) ?? null };
+        return { ticker: t, cot: cot as CotationBase, score: (fond?.score as ScoreCategoriel) ?? null };
       })
     ).then((results) => {
       const mapCot: Record<string, CotationBase> = {};
-      const mapScore: Record<string, ScoreVQ | null> = {};
+      const mapScore: Record<string, ScoreCategoriel | null> = {};
       results.forEach((r) => {
         mapCot[r.ticker] = r.cot;
         mapScore[r.ticker] = r.score;
@@ -119,7 +119,7 @@ function ComparateurContenu() {
   const suggestions = useMemo(() => {
     const q = recherche.trim().toLowerCase();
     if (q.length === 0) return [];
-    return CAC40.filter(
+    return UNIVERS.filter(
       (v) =>
         !tickers.includes(v.ticker) &&
         (v.nom.toLowerCase().includes(q) || v.mnemo.toLowerCase().includes(q))
@@ -127,7 +127,7 @@ function ComparateurContenu() {
   }, [recherche, tickers]);
 
   const series = tickers.map((t, i) => {
-    const v = CAC40.find((x) => x.ticker === t);
+    const v = UNIVERS.find((x) => x.ticker === t);
     const d = points[t];
     return {
       ticker: t,
@@ -163,7 +163,7 @@ function ComparateurContenu() {
         {/* Sélection */}
         <div className="mb-6 flex flex-wrap items-center gap-2">
           {tickers.map((t, i) => {
-            const v = CAC40.find((x) => x.ticker === t);
+            const v = UNIVERS.find((x) => x.ticker === t);
             return (
               <span
                 key={t}

@@ -3,14 +3,14 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { CAC40 } from "@/lib/tickers";
+import { UNIVERS } from "@/lib/tickers";
 import { PLAGES } from "@/lib/plages";
 import LineChart from "@/components/LineChart";
 import ScoreBadge from "@/components/ScoreBadge";
 import { useFavoris } from "@/lib/useFavoris";
 import { DetailValeur } from "@/app/api/historique/[ticker]/route";
 import { CotationBase } from "@/lib/yahooChart";
-import { ScoreVQ, Metrique } from "@/lib/score";
+import { ScoreCategoriel, CategorieNotee, MetriqueNotee, COULEURS_PALIER } from "@/lib/scoreCategoriel";
 
 function formatPrix(n: number | null | undefined, devise?: string | null) {
   if (n === null || n === undefined) return "—";
@@ -25,38 +25,73 @@ function formatVolume(n: number | null | undefined) {
   return `${n}`;
 }
 
-function formatMetrique(m: Metrique) {
+function formatMetrique(m: MetriqueNotee) {
   if (m.valeur === null) return "—";
   return m.unite === "%" ? `${m.valeur.toFixed(2)}%` : `${m.valeur.toFixed(2)}x`;
 }
 
-function BlocMetriques({ titre, score, metriques }: { titre: string; score: number | null; metriques: Metrique[] }) {
+function PalierBadge({ palier }: { palier: MetriqueNotee["palier"] }) {
+  if (!palier) {
+    return (
+      <span className="rounded-md border border-bourse-ligne px-2 py-1 text-xs text-bourse-brume">
+        —
+      </span>
+    );
+  }
+  const c = COULEURS_PALIER[palier];
+  return (
+    <span
+      className="whitespace-nowrap rounded-md px-2 py-1 text-xs font-medium"
+      style={{ color: c.texte, backgroundColor: c.fond }}
+    >
+      {palier}
+    </span>
+  );
+}
+
+function BlocCategorie({ categorie }: { categorie: CategorieNotee }) {
   return (
     <div className="rounded-lg border border-bourse-ligne bg-bourse-panel/60 p-4">
       <div className="mb-3 flex items-center justify-between">
-        <h3 className="font-display text-lg italic text-bourse-texte">{titre}</h3>
-        <span className="font-mono text-sm tabular text-bourse-brumeclair">
-          {score !== null ? `${score}/100` : "—"}
+        <h3 className="font-display text-lg italic text-bourse-texte">{categorie.label}</h3>
+        <span
+          className={`rounded-md px-3 py-1 font-mono text-sm font-semibold tabular ${
+            categorie.points === null
+              ? "text-bourse-brume"
+              : categorie.points >= 20
+              ? "text-bourse-hausse"
+              : categorie.points >= 12.5
+              ? "text-bourse-orclair"
+              : "text-bourse-baisse"
+          }`}
+        >
+          {categorie.points !== null ? categorie.points.toFixed(2) : "—"} / 25
         </span>
       </div>
-      <div className="grid grid-cols-2 gap-3">
-        {metriques.map((m) => (
-          <div key={m.cle} className="rounded-md border border-bourse-ligne/70 bg-bourse-nuit/50 p-3">
-            <div className="text-[11px] uppercase tracking-wider text-bourse-brumeclair">{m.label}</div>
-            <div
-              className={`mt-1 font-mono text-lg tabular ${
-                m.favorable === null
-                  ? "text-bourse-brume"
-                  : m.favorable
-                  ? "text-bourse-hausse"
-                  : "text-bourse-baisse"
-              }`}
-            >
-              {formatMetrique(m)}
-            </div>
-            <div className="mt-0.5 text-[11px] text-bourse-brume">{m.seuil}</div>
-          </div>
-        ))}
+
+      <div className="overflow-hidden rounded-md border border-bourse-ligne/70">
+        <table className="w-full border-collapse text-sm">
+          <thead>
+            <tr className="border-b border-bourse-ligne/70 bg-bourse-nuit/40 text-left text-[11px] uppercase tracking-wider text-bourse-brumeclair">
+              <th className="px-3 py-2 font-medium">Métrique</th>
+              <th className="px-3 py-2 text-right font-medium">Valeur</th>
+              <th className="px-3 py-2 text-right font-medium">Score</th>
+            </tr>
+          </thead>
+          <tbody>
+            {categorie.metriques.map((m) => (
+              <tr key={m.cle} className="border-b border-bourse-ligne/40 last:border-0 odd:bg-bourse-nuit/20">
+                <td className="px-3 py-2 text-bourse-texte">{m.label}</td>
+                <td className="px-3 py-2 text-right font-mono tabular text-bourse-brumeclair">
+                  {formatMetrique(m)}
+                </td>
+                <td className="px-3 py-2 text-right">
+                  <PalierBadge palier={m.palier} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );
@@ -66,12 +101,12 @@ export default function PageValeur() {
   const params = useParams<{ ticker: string }>();
   const router = useRouter();
   const ticker = decodeURIComponent(params.ticker);
-  const valeur = CAC40.find((v) => v.ticker === ticker);
+  const valeur = UNIVERS.find((v) => v.ticker === ticker);
 
   const [plage, setPlage] = useState("1y");
   const [points, setPoints] = useState<DetailValeur | null>(null);
   const [cotation, setCotation] = useState<CotationBase | null>(null);
-  const [score, setScore] = useState<ScoreVQ | null>(null);
+  const [score, setScore] = useState<ScoreCategoriel | null>(null);
   const [chargementGraphique, setChargementGraphique] = useState(true);
   const [chargementFiche, setChargementFiche] = useState(true);
   const [erreur, setErreur] = useState(false);
@@ -109,7 +144,7 @@ export default function PageValeur() {
       .then(([cot, fond]) => {
         if (annule) return;
         setCotation(cot as CotationBase);
-        setScore((fond?.score as ScoreVQ) ?? null);
+        setScore((fond?.score as ScoreCategoriel) ?? null);
         if (cot?.erreur) setErreur(true);
       })
       .catch(() => {
@@ -137,7 +172,7 @@ export default function PageValeur() {
 
   return (
     <main className="min-h-screen pb-16">
-      <div className="mx-auto max-w-4xl px-5 pt-10 sm:px-8">
+      <div className="mx-auto max-w-5xl px-5 pt-10 sm:px-8">
         <button
           onClick={() => router.push("/")}
           className="mb-6 inline-flex items-center gap-1 text-sm text-bourse-brumeclair hover:text-bourse-or"
@@ -181,6 +216,11 @@ export default function PageValeur() {
               >
                 {hausse ? "▲" : "▼"} {cotation.variation?.toFixed(2)} ({hausse ? "+" : ""}
                 {cotation.variationPct.toFixed(2)}%)
+              </span>
+            )}
+            {score && (
+              <span className="font-mono text-xs tabular text-bourse-brumeclair">
+                {score.points.toFixed(2)} / {score.pointsMax} points
               </span>
             )}
           </div>
@@ -247,6 +287,7 @@ export default function PageValeur() {
             { label: "Clôture veille", val: formatPrix(cotation?.clotureVeille, cotation?.devise) },
             { label: "Secteur", val: valeur?.secteur ?? "—" },
             { label: "Code Euronext", val: valeur?.mnemo ?? "—" },
+            { label: "Siège social", val: valeur?.siege ?? "—" },
           ].map((s) => (
             <div
               key={s.label}
@@ -260,29 +301,34 @@ export default function PageValeur() {
           ))}
         </div>
 
-        {/* Détail du score Value/Qualité */}
+        {/* Détail du score par catégorie */}
         {score ? (
           <div className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-2">
-            <BlocMetriques titre="Approche Value" score={score.value.valeur} metriques={score.value.metriques} />
-            <BlocMetriques titre="Approche Qualité" score={score.quality.valeur} metriques={score.quality.metriques} />
+            {score.categories.map((cat) => (
+              <BlocCategorie key={cat.cle} categorie={cat} />
+            ))}
           </div>
         ) : (
           !chargementFiche && (
             <div className="mb-8 rounded-lg border border-bourse-ligne bg-bourse-panel/60 p-4 text-sm text-bourse-brumeclair">
-              Données fondamentales indisponibles pour cette valeur pour le moment — le score
-              Value/Qualité ne peut pas être calculé.
+              Données fondamentales indisponibles pour cette valeur pour le moment — le score ne
+              peut pas être calculé.
             </div>
           )
         )}
 
         <p className="mb-8 text-xs text-bourse-brume">
-          Score = 50% approche value (rendement des bénéfices, du cash-flow
-          libre, VE/EBITDA, P/B) + 50% approche qualité (ROE, ROA, marge
-          opérationnelle, dette nette/EBITDA, croissance du chiffre
-          d&rsquo;affaires). Un score n&rsquo;est calculé que si au moins 2
-          métriques sont disponibles par approche, pour éviter qu&rsquo;une
-          seule donnée isolée fausse la note. Seuils indicatifs, à but
-          pédagogique — ne constitue pas un conseil en investissement.
+          Score sur 100, réparti en 4 catégories de 25 points chacune :
+          Rentabilité, Gestion, Croissance, Santé financière. Chaque
+          métrique est classée sur 5 paliers (Très faible à Très bon) selon
+          des seuils fixes définis par nos soins — à but pédagogique,
+          n&rsquo;étant pas issus d&rsquo;une méthodologie propriétaire
+          connue et non ajustés par secteur. La croissance est un TCAC sur
+          jusqu&rsquo;à 3 ans. Une catégorie n&rsquo;est notée que si au
+          moins 2 de ses métriques sont disponibles ; si une catégorie
+          entière manque de données, le score est calculé sur les points
+          restants (affiché "X / Y points" ci-dessus) plutôt que sur 100.
+          Ne constitue pas un conseil en investissement.
         </p>
 
         <div>
