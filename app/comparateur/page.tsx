@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { UNIVERS } from "@/lib/tickers";
 import { PLAGES } from "@/lib/plages";
 import ComparisonChart from "@/components/ComparisonChart";
+import ComparaisonCategories from "@/components/ComparaisonCategories";
 import ScoreBadge from "@/components/ScoreBadge";
 import { DetailValeur } from "@/app/api/historique/[ticker]/route";
 import { CotationBase } from "@/lib/yahooChart";
@@ -292,6 +293,22 @@ function ComparateurContenu() {
                 </tbody>
               </table>
             </div>
+
+            {/* Détail des 4 catégories, côte à côte */}
+            <h2 className="mb-3 mt-8 font-display text-xl italic text-bourse-texte">
+              Détail par catégorie
+            </h2>
+            <ComparaisonCategories
+              series={tickers.map((t, i) => {
+                const v = UNIVERS.find((x) => x.ticker === t);
+                return {
+                  ticker: t,
+                  nom: v?.nom ?? t,
+                  couleur: COULEURS[i % COULEURS.length],
+                  score: scores[t] ?? null,
+                };
+              })}
+            />
           </>
         )}
       </div>

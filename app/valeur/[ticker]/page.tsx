@@ -10,7 +10,8 @@ import ScoreBadge from "@/components/ScoreBadge";
 import { useFavoris } from "@/lib/useFavoris";
 import { DetailValeur } from "@/app/api/historique/[ticker]/route";
 import { CotationBase } from "@/lib/yahooChart";
-import { ScoreCategoriel, CategorieNotee, MetriqueNotee, COULEURS_PALIER } from "@/lib/scoreCategoriel";
+import { ScoreCategoriel, CategorieNotee } from "@/lib/scoreCategoriel";
+import PalierBadge, { formatMetrique } from "@/components/PalierBadge";
 
 function formatPrix(n: number | null | undefined, devise?: string | null) {
   if (n === null || n === undefined) return "—";
@@ -23,30 +24,6 @@ function formatVolume(n: number | null | undefined) {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)} M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)} k`;
   return `${n}`;
-}
-
-function formatMetrique(m: MetriqueNotee) {
-  if (m.valeur === null) return "—";
-  return m.unite === "%" ? `${m.valeur.toFixed(2)}%` : `${m.valeur.toFixed(2)}x`;
-}
-
-function PalierBadge({ palier }: { palier: MetriqueNotee["palier"] }) {
-  if (!palier) {
-    return (
-      <span className="rounded-md border border-bourse-ligne px-2 py-1 text-xs text-bourse-brume">
-        —
-      </span>
-    );
-  }
-  const c = COULEURS_PALIER[palier];
-  return (
-    <span
-      className="whitespace-nowrap rounded-md px-2 py-1 text-xs font-medium"
-      style={{ color: c.texte, backgroundColor: c.fond }}
-    >
-      {palier}
-    </span>
-  );
 }
 
 function BlocCategorie({ categorie }: { categorie: CategorieNotee }) {

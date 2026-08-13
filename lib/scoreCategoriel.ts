@@ -90,6 +90,16 @@ const CATEGORIES: { cle: string; label: string; metriques: DefMetrique[] }[] = [
   { cle: "santeFinanciere", label: "Santé financière", metriques: SANTE_FINANCIERE },
 ];
 
+// Liste canonique (secteur/catégorie → métriques) exposée pour l'UI, par
+// exemple pour construire un tableau de comparaison où les lignes de
+// métriques doivent rester identiques même si une valeur n'a pas encore
+// chargé ses données.
+export const DEFINITIONS_CATEGORIES = CATEGORIES.map((c) => ({
+  cle: c.cle,
+  label: c.label,
+  metriques: c.metriques.map((m) => ({ cle: m.cle as string, label: m.label, unite: m.unite })),
+}));
+
 const POINTS_PAR_CATEGORIE = 25;
 // Nombre minimum de métriques disponibles dans une catégorie pour lui
 // attribuer une note — en dessous, la catégorie est exclue plutôt que
