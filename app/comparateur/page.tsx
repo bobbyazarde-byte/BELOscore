@@ -3,7 +3,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { UNIVERS } from "@/lib/tickers";
+import { TOUTES_VALEURS } from "@/lib/tickers";
 import { PLAGES } from "@/lib/plages";
 import ComparisonChart from "@/components/ComparisonChart";
 import ComparaisonCategories from "@/components/ComparaisonCategories";
@@ -11,15 +11,10 @@ import ScoreBadge from "@/components/ScoreBadge";
 import { DetailValeur } from "@/app/api/historique/[ticker]/route";
 import { CotationBase } from "@/lib/yahooChart";
 import { ScoreCategoriel } from "@/lib/scoreCategoriel";
+import { formatPrix } from "@/lib/format";
 
 const MAX = 3;
 const COULEURS = ["#C9A15A", "#3FB68B", "#7C9CE2"];
-
-function formatPrix(n: number | null | undefined, devise?: string | null) {
-  if (n === null || n === undefined) return "—";
-  const val = n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  return devise === "EUR" || !devise ? `${val} €` : `${val} ${devise}`;
-}
 
 function ComparateurContenu() {
   const params = useSearchParams();
@@ -120,7 +115,7 @@ function ComparateurContenu() {
   const suggestions = useMemo(() => {
     const q = recherche.trim().toLowerCase();
     if (q.length === 0) return [];
-    return UNIVERS.filter(
+    return TOUTES_VALEURS.filter(
       (v) =>
         !tickers.includes(v.ticker) &&
         (v.nom.toLowerCase().includes(q) || v.mnemo.toLowerCase().includes(q))
@@ -128,7 +123,7 @@ function ComparateurContenu() {
   }, [recherche, tickers]);
 
   const series = tickers.map((t, i) => {
-    const v = UNIVERS.find((x) => x.ticker === t);
+    const v = TOUTES_VALEURS.find((x) => x.ticker === t);
     const d = points[t];
     return {
       ticker: t,
@@ -164,7 +159,7 @@ function ComparateurContenu() {
         {/* Sélection */}
         <div className="mb-6 flex flex-wrap items-center gap-2">
           {tickers.map((t, i) => {
-            const v = UNIVERS.find((x) => x.ticker === t);
+            const v = TOUTES_VALEURS.find((x) => x.ticker === t);
             return (
               <span
                 key={t}
@@ -300,7 +295,7 @@ function ComparateurContenu() {
             </h2>
             <ComparaisonCategories
               series={tickers.map((t, i) => {
-                const v = UNIVERS.find((x) => x.ticker === t);
+                const v = TOUTES_VALEURS.find((x) => x.ticker === t);
                 return {
                   ticker: t,
                   nom: v?.nom ?? t,

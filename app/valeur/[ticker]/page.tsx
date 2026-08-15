@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { UNIVERS } from "@/lib/tickers";
+import { trouverValeur } from "@/lib/tickers";
 import { PLAGES } from "@/lib/plages";
 import LineChart from "@/components/LineChart";
 import ScoreBadge from "@/components/ScoreBadge";
@@ -12,19 +12,7 @@ import { DetailValeur } from "@/app/api/historique/[ticker]/route";
 import { CotationBase } from "@/lib/yahooChart";
 import { ScoreCategoriel, CategorieNotee } from "@/lib/scoreCategoriel";
 import PalierBadge, { formatMetrique } from "@/components/PalierBadge";
-
-function formatPrix(n: number | null | undefined, devise?: string | null) {
-  if (n === null || n === undefined) return "—";
-  const val = n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  return devise === "EUR" || !devise ? `${val} €` : `${val} ${devise}`;
-}
-
-function formatVolume(n: number | null | undefined) {
-  if (n === null || n === undefined) return "—";
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)} M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)} k`;
-  return `${n}`;
-}
+import { formatPrix, formatVolume } from "@/lib/format";
 
 function BlocCategorie({ categorie }: { categorie: CategorieNotee }) {
   return (
@@ -78,7 +66,7 @@ export default function PageValeur() {
   const params = useParams<{ ticker: string }>();
   const router = useRouter();
   const ticker = decodeURIComponent(params.ticker);
-  const valeur = UNIVERS.find((v) => v.ticker === ticker);
+  const valeur = trouverValeur(ticker);
 
   const [plage, setPlage] = useState("1y");
   const [points, setPoints] = useState<DetailValeur | null>(null);

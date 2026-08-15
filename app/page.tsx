@@ -2,14 +2,16 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { UNIVERS, SECTEURS, Secteur } from "@/lib/tickers";
+import { UNIVERSS, CodeUnivers, UNIVERS_PAR_DEFAUT, secteursPour, Secteur } from "@/lib/tickers";
 import { Cotation } from "@/app/api/quotes/route";
 import TickerTape from "@/components/TickerTape";
 import Sparkline from "@/components/Sparkline";
 import ScoreBadge from "@/components/ScoreBadge";
 import { useFavoris } from "@/lib/useFavoris";
+import { formatPrix, formatVolume } from "@/lib/format";
 
 const MAX_COMPARATEUR = 3;
+const CLE_UNIVERS = "beloscore-univers";
 
 type Colonne =
   | "nom"
@@ -36,23 +38,14 @@ const ETATS: Record<string, string> = {
   CLOSED: "Clôturé",
 };
 
-function formatPrix(n: number | null | undefined, devise?: string | null) {
-  if (n === null || n === undefined) return "—";
-  const val = n.toLocaleString("fr-FR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-  return devise === "EUR" || !devise ? `${val} €` : `${val} ${devise}`;
-}
-
-function formatVolume(n: number | null | undefined) {
-  if (n === null || n === undefined) return "—";
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)} M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)} k`;
-  return `${n}`;
-}
+const LIEU_PAR_UNIVERS: Record<CodeUnivers, string> = {
+  sbf120: "Place de Paris · Euronext",
+  sp500: "Wall Street · NYSE / Nasdaq",
+};
 
 export default function Page() {
+  const [univers, setUnivers] = useState<CodeUnivers>(UNIVERS_PAR_DEFAUT);
+  const [universPret, setUniversPret] = useState(false);
   const [cotations, setCotations] = useState<Record<string, Cotation>>({});
   const [indice, setIndice] = useState<Cotation | null>(null);
   const [chargement, setChargement] = useState(true);
@@ -69,6 +62,31 @@ export default function Page() {
   const [favorisUniquement, setFavorisUniquement] = useState(false);
   const { estFavori, basculer: basculerFavori, pret: favorisPrets } = useFavoris();
 
+  // Charge le choix d'univers précédemment enregistré (une fois, au montage).
+  useEffect(() => {
+    try {
+      const enregistre = window.localStorage.getItem(CLE_UNIVERS);
+      if (enregistre === "sbf120" || enregistre === "sp500") {
+        setUnivers(enregistre);
+      }
+    } catch {
+      // localStorage indisponible : on reste sur l'univers par défaut.
+    } finally {
+      setUniversPret(true);
+    }
+  }, []);
+
+  const changerUnivers = (code: CodeUnivers) => {
+    setUnivers(code);
+    setSecteur("Tous");
+    setComparateur([]);
+    try {
+      window.localStorage.setItem(CLE_UNIVERS, code);
+    } catch {
+      // silencieux
+    }
+  };
+
   const basculerComparateur = (ticker: string) => {
     setComparateur((prev) => {
       if (prev.includes(ticker)) return prev.filter((t) => t !== ticker);
@@ -81,7 +99,7 @@ export default function Page() {
     setChargement(true);
     setErreurGlobale(null);
     try {
-      const res = await fetch("/api/quotes", { cache: "no-store" });
+      const res = await fetch(`/api/quotes?univers=${univers}`, { cache: "no-store" });
       if (!res.ok) throw new Error("Réponse API invalide");
       const data = await res.json();
       const map: Record<string, Cotation> = {};
@@ -96,29 +114,33 @@ export default function Page() {
     } finally {
       setChargement(false);
     }
-  }, []);
+  }, [univers]);
 
   useEffect(() => {
+    if (!universPret) return;
     charger();
-    // Rafraîchissement automatique toutes les 5 minutes — l'univers étant
-    // passé de 40 à ~120 valeurs (donc ~240 requêtes Yahoo par
-    // rafraîchissement), un intervalle plus long évite de solliciter
-    // Yahoo trop fréquemment. Le bouton "Actualiser" reste disponible
-    // pour un rafraîchissement manuel immédiat.
+    // Rafraîchissement automatique toutes les 5 minutes — le S&P 500
+    // pouvant représenter jusqu'à ~1000 requêtes Yahoo par rafraîchissement,
+    // un intervalle plus long évite de solliciter Yahoo trop fréquemment.
+    // Le bouton "Actualiser" reste disponible pour un rafraîchissement
+    // manuel immédiat.
     const id = setInterval(charger, 5 * 60_000);
     return () => clearInterval(id);
-  }, [charger]);
+  }, [charger, universPret]);
+
+  const valeursUnivers = UNIVERSS[univers].valeurs;
+  const secteurs = useMemo(() => secteursPour(univers), [univers]);
 
   const lignes: Ligne[] = useMemo(
     () =>
-      UNIVERS.map((v) => ({
+      valeursUnivers.map((v) => ({
         nom: v.nom,
         ticker: v.ticker,
         mnemo: v.mnemo,
         secteur: v.secteur,
         cotation: cotations[v.ticker],
       })),
-    [cotations]
+    [valeursUnivers, cotations]
   );
 
   const lignesFiltrees = useMemo(() => {
@@ -190,33 +212,37 @@ export default function Page() {
   return (
     <main className="min-h-screen pb-16">
       {/* Bandeau défilant */}
-      <TickerTape quotes={Object.values(cotations)} />
+      <TickerTape quotes={Object.values(cotations)} valeurs={valeursUnivers} />
 
       <div className="mx-auto max-w-7xl px-5 pt-10 sm:px-8">
         {/* En-tête */}
-        <header className="mb-8 flex flex-col gap-6 border-b border-bourse-ligne pb-8 sm:flex-row sm:items-end sm:justify-between">
+        <header className="mb-6 flex flex-col gap-6 border-b border-bourse-ligne pb-8 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <div className="mb-2 flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-bourse-or">
               <span className="h-1.5 w-1.5 animate-blink-slow rounded-full bg-bourse-hausse" />
-              Place de Paris · Euronext
+              {LIEU_PAR_UNIVERS[univers]}
             </div>
             <h1 className="font-display text-4xl font-medium italic text-bourse-texte sm:text-5xl">
               BELOSCORE
             </h1>
             <p className="mt-2 max-w-md text-sm text-bourse-brumeclair">
-              Screener de l&rsquo;indice SBF 120 (CAC 40 + 80 valeurs
-              supplémentaires), cours en temps différé fournis par Yahoo
-              Finance.
+              Screener de l&rsquo;indice {UNIVERSS[univers].nom}, cours en
+              temps différé fournis par Yahoo Finance.
             </p>
           </div>
 
           <div className="flex flex-col items-start gap-1 sm:items-end">
             <span className="text-xs uppercase tracking-widest text-bourse-brumeclair">
-              CAC 40
+              {UNIVERSS[univers].indiceNom}
             </span>
             <div className="flex items-baseline gap-3">
               <span className="font-mono text-3xl tabular text-bourse-texte">
-                {indice ? formatPrix(indice.prix, "PTS").replace(" PTS", "") : "—"}
+                {indice?.prix !== null && indice?.prix !== undefined
+                  ? indice.prix.toLocaleString("fr-FR", {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })
+                  : "—"}
               </span>
               {indice && indice.variationPct !== null && (
                 <span
@@ -239,6 +265,23 @@ export default function Page() {
           </div>
         </header>
 
+        {/* Sélecteur d'univers */}
+        <div className="mb-6 flex gap-2">
+          {(Object.keys(UNIVERSS) as CodeUnivers[]).map((code) => (
+            <button
+              key={code}
+              onClick={() => changerUnivers(code)}
+              className={`rounded-md border px-4 py-2 text-sm font-medium transition ${
+                univers === code
+                  ? "border-bourse-or/50 bg-bourse-or/10 text-bourse-orclair"
+                  : "border-bourse-ligne text-bourse-brumeclair hover:text-bourse-texte"
+              }`}
+            >
+              {UNIVERSS[code].nom}
+            </button>
+          ))}
+        </div>
+
         {/* Filtres */}
         <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-1 flex-col gap-3 sm:flex-row">
@@ -255,7 +298,7 @@ export default function Page() {
               className="w-full max-w-xs rounded-md border border-bourse-ligne bg-bourse-panel px-3 py-2 text-sm text-bourse-texte focus:border-bourse-or focus:outline-none focus:ring-1 focus:ring-bourse-or sm:w-64"
             >
               <option value="Tous">Tous les secteurs</option>
-              {SECTEURS.map((s) => (
+              {secteurs.map((s) => (
                 <option key={s} value={s}>
                   {s}
                 </option>
@@ -302,10 +345,10 @@ export default function Page() {
                   <span className="sr-only">Comparer</span>
                 </th>
                 {enTeteTri("nom", "Valeur")}
+                {enTeteTri("score", "Score", true)}
                 {enTeteTri("secteur", "Secteur")}
                 {enTeteTri("prix", "Cours", true)}
                 {enTeteTri("variationPct", "Var. jour", true)}
-                {enTeteTri("score", "Score", true)}
                 <th className="px-3 py-2.5 text-right text-xs font-medium uppercase tracking-wider text-bourse-brumeclair">
                   Tendance 1 mois
                 </th>
@@ -386,6 +429,11 @@ export default function Page() {
                           </span>
                         </Link>
                       </td>
+                      <td className="px-3 py-3">
+                        <div className="flex justify-end">
+                          <ScoreBadge lettre={c?.score?.lettre ?? null} />
+                        </div>
+                      </td>
                       <td className="px-3 py-3 text-xs text-bourse-brumeclair">
                         {l.secteur}
                       </td>
@@ -404,11 +452,6 @@ export default function Page() {
                         {c?.erreur || c?.variationPct === null || c?.variationPct === undefined
                           ? "—"
                           : `${hausse ? "+" : ""}${c.variationPct.toFixed(2)}%`}
-                      </td>
-                      <td className="px-3 py-3">
-                        <div className="flex justify-end">
-                          <ScoreBadge lettre={c?.score?.lettre ?? null} />
-                        </div>
                       </td>
                       <td className="px-3 py-3">
                         <div className="flex justify-end">
@@ -434,9 +477,9 @@ export default function Page() {
 
         <p className="mt-4 text-xs text-bourse-brume">
           {lignesFiltrees.length} valeur{lignesFiltrees.length > 1 ? "s" : ""}{" "}
-          affichée{lignesFiltrees.length > 1 ? "s" : ""} sur {UNIVERS.length}. Données
-          fournies par Yahoo Finance, à titre informatif uniquement — ne
-          constitue pas un conseil en investissement.
+          affichée{lignesFiltrees.length > 1 ? "s" : ""} sur {valeursUnivers.length}.
+          Données fournies par Yahoo Finance, à titre informatif uniquement —
+          ne constitue pas un conseil en investissement.
         </p>
         <p className="mt-1 text-xs text-bourse-brume">
           Le <span className="text-bourse-brumeclair">Score</span> (S à F) est réparti
@@ -459,7 +502,7 @@ export default function Page() {
                 Comparateur ({comparateur.length}/{MAX_COMPARATEUR})
               </span>
               {comparateur.map((t) => {
-                const v = UNIVERS.find((x) => x.ticker === t);
+                const v = valeursUnivers.find((x) => x.ticker === t);
                 return (
                   <span
                     key={t}

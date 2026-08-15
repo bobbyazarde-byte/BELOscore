@@ -1,10 +1,12 @@
-# BELOSCORE — Screener SBF 120
+# BELOSCORE — Screener SBF 120 / S&P 500
 
-Screener d'environ 120 valeurs du SBF 120 (CAC 40 + 80 valeurs
-supplémentaires liquides d'Euronext Paris), avec un **score Value/Qualité** (S à F) inspiré des plateformes de notation
-boursière, cours en temps différé, filtrable par secteur, avec
-comparateur et page détail par valeur. Construit avec **Next.js 16** (App
-Router, Turbopack) et **Tailwind CSS**, sans base de données à gérer.
+Screener de deux univers au choix — le **SBF 120** (environ 120 valeurs
+françaises, CAC 40 compris) et le **S&P 500** (500 grandes valeurs
+américaines) — avec un score sur 100 réparti en 4 catégories
+(Rentabilité, Gestion, Croissance, Santé financière), cours en temps
+différé, filtrable par secteur, avec comparateur et page détail par
+valeur. Construit avec **Next.js 16** (App Router, Turbopack) et
+**Tailwind CSS**, sans base de données à gérer.
 
 ⚠️ Données à titre informatif uniquement — ce projet ne constitue pas un
 conseil en investissement.
@@ -15,32 +17,52 @@ le support est terminé depuis le 26 octobre 2025. Gardez `next` à jour de
 temps en temps avec `npm outdated` / `npm update`, et vérifiez
 régulièrement avec `npm audit`.
 
-## ⚠️ Fiabilité des tickers du SBF 120 — à lire avant de déployer
+## ⚠️ À lire avant de déployer : fiabilité des tickers et échelle du S&P 500
 
-Pour les **40 valeurs du CAC 40**, chaque ticker a été vérifié
-individuellement et est fiable.
-
-Pour les **~80 valeurs supplémentaires du SBF 120**, la composition
+**SBF 120** — pour les 40 valeurs du CAC 40, chaque ticker a été vérifié
+individuellement. Pour les ~80 valeurs supplémentaires, la composition
 provient d'un relevé daté de décembre 2024 et les tickers Euronext Paris
-(codes `.PA`) sont une reconstitution de bonne foi, **non vérifiée valeur
-par valeur**. Certains seront corrects, d'autres peuvent être erronés ou
-obsolètes (fusions, changements de code, sorties d'indice depuis 2024).
+sont une reconstitution de bonne foi, non vérifiée valeur par valeur.
 
-**Ce que ça veut dire concrètement :** une valeur avec un ticker incorrect
-n'affichera jamais de données (cours et score restent à "—" en
-permanence) plutôt que de casser la page — le reste du screener continue
-de fonctionner normalement.
+**S&P 500** — la composition et les tickers proviennent d'un relevé
+Wikipédia à jour (avril 2026), une source nettement plus fiable pour des
+tickers américains très documentés. Deux ajustements techniques : les
+tickers à plusieurs classes d'actions utilisent un tiret plutôt qu'un
+point pour Yahoo Finance (`BRK.B` devient `BRK-B`), et les 11 secteurs
+GICS sont traduits en français.
+
+**Dans les deux cas :** une valeur avec un ticker incorrect n'affichera
+jamais de données (cours et score restent à "—" en permanence) plutôt que
+de casser la page.
+
+**⚠️ Le S&P 500 est un changement d'échelle important.** 500 valeurs ×
+2 requêtes (cours + fondamentaux) = jusqu'à ~1000 requêtes Yahoo Finance
+par chargement de la page d'accueil, contre ~240 pour le SBF 120. C'est
+nettement plus susceptible de :
+- dépasser la durée d'exécution autorisée par votre plan Vercel,
+- déclencher un blocage temporaire de l'accès par Yahoo Finance (rafale
+  de requêtes suspecte),
+- rendre le chargement du tableau très lent (potentiellement 30 secondes
+  ou plus).
+
+Le SBF 120 reste l'univers le plus rapide et fiable des deux. Si le S&P
+500 échoue ou est trop lent en pratique, voir la section Performance
+plus bas pour les options (réduire la concurrence, passer à un plan
+Vercel Pro, ou migrer vers un fournisseur de données payant).
 
 **Comment corriger une valeur cassée :**
 1. Repérez les lignes qui restent vides ("—" partout) après plusieurs
    rafraîchissements.
 2. Cherchez le nom de la société sur [Yahoo Finance](https://finance.yahoo.com)
-   pour trouver son ticker exact (format `XXX.PA` pour Euronext Paris).
-3. Corrigez la ligne correspondante dans `lib/tickers.ts`.
+   pour trouver son ticker exact.
+3. Corrigez la ligne correspondante dans `lib/tickers.ts` (tableau
+   `SBF120` ou `SP500` selon le cas).
 
 ## Fonctionnalités
 
-- Tableau triable/filtrable des valeurs du SBF 120, avec bandeau défilant
+- **Sélecteur d'univers** : bascule entre SBF 120 et S&P 500 en un clic,
+  choix mémorisé dans le navigateur
+- Tableau triable/filtrable, avec bandeau défilant
 - Mini-graphique (sparkline) de tendance sur 1 mois pour chaque valeur
 - **Score sur 100, réparti en 4 catégories de 25 points** : Rentabilité
   (marge brute, marge opérationnelle, marge de FCF, marge d'OCF,
@@ -50,21 +72,21 @@ de fonctionner normalement.
   vs passif courant, variation du nombre d'actions). Chaque métrique est
   classée sur 5 paliers (Très faible à Très bon) selon des **seuils
   fixes** définis par nos soins — pédagogiques, pas issus d'une
-  méthodologie propriétaire connue, et **non ajustés par secteur** (un
-  choix assumé : comparer chaque valeur au même référentiel plutôt qu'à
-  ses seuls pairs). Une catégorie n'est notée que si au moins 2 de ses
-  18 métriques au total sont disponibles ; si une catégorie entière
-  manque de données, le score est calculé sur les points restants plutôt
-  que faussement ramené sur 100. Détail complet des 4 catégories et de
-  leurs métriques sur chaque page valeur.
+  méthodologie propriétaire connue, et **non ajustés par secteur**. Une
+  catégorie n'est notée que si au moins 2 de ses 18 métriques sont
+  disponibles ; si une catégorie entière manque de données, le score est
+  calculé sur les points restants plutôt que faussement ramené sur 100.
+  Détail complet des 4 catégories sur chaque page valeur.
 - **Favoris ★** : marque des valeurs en favori (persistant dans le
   navigateur via localStorage) et filtre le tableau dessus
-- Page détail par valeur (clic sur son nom) : graphique interactif sur
-  6 périodes (1 jour, 5 jours, 1 mois, YTD, 1 an, 5 ans) avec performance
-  affichée sur la période sélectionnée, fiche complète des 4 catégories
-  de métriques
-- Comparateur : sélectionne jusqu'à 3 valeurs dans le tableau (cases à
-  cocher) pour les superposer en performance relative (base 100)
+- Page détail par valeur : graphique interactif sur 6 périodes (1 jour,
+  5 jours, 1 mois, YTD, 1 an, 5 ans) avec performance affichée sur la
+  période sélectionnée, fiche complète des 4 catégories de métriques
+- Comparateur : sélectionne jusqu'à 3 valeurs (cases à cocher) pour les
+  superposer en performance relative (base 100) — fonctionne même en
+  mélangeant une valeur française et une valeur américaine
+- Formatage automatique de la devise (€, $, £...) selon la place de
+  cotation de chaque valeur
 
 ## Sources de données
 
@@ -73,46 +95,38 @@ de fonctionner normalement.
   dernières séances de l'historique journalier plutôt que du champ
   `previousClose` de Yahoo, qui peut être absent pour certaines valeurs et
   fausser le calcul.
-- **Données fondamentales** (pour le score Value/Qualité) : endpoint
+- **Données fondamentales** (pour le score) : endpoint
   `v10/finance/quoteSummary` de Yahoo Finance. Cet endpoint est plus
   restrictif que celui des cours et exige un jeton de session ("crumb")
   récupéré automatiquement par le serveur avant chaque lot de requêtes.
   Si Yahoo bloque ou modifie cet endpoint, le score affichera simplement
-  "—" pour les valeurs concernées — le reste du site (cours, graphiques,
-  comparateur) continue de fonctionner normalement.
+  "—" pour les valeurs concernées — le reste du site continue de
+  fonctionner normalement.
 
 ## Performance et fiabilité à cette échelle
-
-L'univers étant passé de 40 à ~120 valeurs, `/api/quotes` envoie jusqu'à
-~240 requêtes vers Yahoo Finance (cours + fondamentaux) à chaque
-chargement de la page d'accueil. Plusieurs mesures limitent le risque :
 
 - Les requêtes sont envoyées avec une **limite de concurrence** (15 en
   parallèle, voir `lib/concurrency.ts`) plutôt que toutes en même temps,
   pour réduire le risque que Yahoo bloque l'accès comme trafic suspect.
 - Le rafraîchissement automatique de la page d'accueil est espacé à
-  **5 minutes** (au lieu de 90 secondes pour 40 valeurs) — le bouton
-  "Actualiser" reste disponible pour un rafraîchissement manuel immédiat.
+  **5 minutes** — le bouton "Actualiser" reste disponible pour un
+  rafraîchissement manuel immédiat.
 - La route `/api/quotes` est configurée avec `maxDuration = 300` secondes.
-
-**Note :** le score étant désormais calculé par seuils fixes (plus de
-comparaison aux pairs du secteur), ouvrir une page détail ou le
-comparateur ne déclenche qu'un seul appel Yahoo par valeur pour les
-données fondamentales — plus léger que la version précédente à
-classement sectoriel. En contrepartie, le calcul du score s'appuie sur
-davantage de modules Yahoo (bilan, compte de résultat et flux de
-trésorerie sur plusieurs années), ce qui peut réduire la couverture par
-rapport à une version plus simple — voir la section sur la fiabilité des
-données plus haut.
+- Le score étant calculé par seuils fixes (pas de comparaison aux pairs),
+  ouvrir une page détail ou le comparateur ne déclenche qu'un seul appel
+  Yahoo par valeur pour les données fondamentales.
 
 **Si le chargement échoue ou est trop lent en pratique**, plusieurs
 options, de la plus simple à la plus lourde :
-1. Réduire `CONCURRENCE` dans `app/api/quotes/route.ts` (moins de requêtes
+1. Rester sur le SBF 120 pour un usage quotidien, et n'utiliser le S&P
+   500 qu'occasionnellement.
+2. Réduire `CONCURRENCE` dans `app/api/quotes/route.ts` (moins de requêtes
    simultanées, plus lent mais plus discret).
-2. Retirer certaines valeurs de `lib/tickers.ts` pour réduire l'univers.
-3. Passer au plan Vercel Pro si le plan Hobby impose un timeout trop court
+3. Retirer des valeurs de `lib/tickers.ts` pour réduire l'univers S&P 500
+   (par exemple ne garder que les 100-200 plus grosses capitalisations).
+4. Passer au plan Vercel Pro si le plan Hobby impose un timeout trop court
    pour vos fonctions serverless.
-4. Migrer vers un fournisseur de données payant avec clé d'API (voir
+5. Migrer vers un fournisseur de données payant avec clé d'API (voir
    plus bas) qui n'a pas les mêmes limites de fiabilité que le scraping
    Yahoo Finance.
 
@@ -133,7 +147,7 @@ Ouvrez ensuite [http://localhost:3000](http://localhost:3000).
 cd cac40-screener
 git init
 git add .
-git commit -m "Screener SBF 120"
+git commit -m "Screener SBF 120 / S&P 500"
 git branch -M main
 git remote add origin https://github.com/<votre-utilisateur>/<votre-repo>.git
 git push -u origin main
@@ -156,11 +170,11 @@ automatiquement le site.
 
 ```
 app/
-  api/quotes/route.ts               → cours + score de l'univers (page d'accueil)
+  api/quotes/route.ts               → cours + score de l'univers choisi (?univers=sbf120|sp500)
   api/cotation/[ticker]/route.ts    → cours robuste d'une seule valeur
   api/fondamentaux/[ticker]/route.ts → données fondamentales + score d'une valeur
   api/historique/[ticker]/route.ts  → points du graphique pour une période donnée
-  page.tsx                          → l'interface du screener (recherche, filtres, tableau)
+  page.tsx                          → l'interface du screener (sélecteur d'univers, filtres, tableau)
   valeur/[ticker]/page.tsx          → page détail d'une valeur (graphique, métriques)
   comparateur/page.tsx              → comparateur de 2-3 valeurs (base 100)
   layout.tsx                        → structure HTML globale + polices
@@ -170,18 +184,21 @@ components/
   Sparkline.tsx          → mini-graphique de tendance dans le tableau
   LineChart.tsx           → graphique détaillé (page valeur)
   ComparisonChart.tsx      → graphique superposé (comparateur)
-  ScoreBadge.tsx            → badge visuel du score (lettre)
+  ComparaisonCategories.tsx → détail des 4 catégories côte à côte (comparateur)
+  PalierBadge.tsx            → badge de palier réutilisable
+  ScoreBadge.tsx               → badge visuel du score (lettre)
 lib/
-  tickers.ts                → univers de valeurs (nom, ticker, secteur, siège)
-  plages.ts                   → périodes disponibles pour les graphiques
-  score.ts                     → types et lettre du score (S/A/B/C/D/F)
-  scoreCategoriel.ts             → calcul du score à 4 catégories, seuils fixes
-  fondamentaux.ts                → récupération des données fondamentales Yahoo
-  yahooChart.ts                    → récupération et calcul des cours Yahoo
-  yahooAuth.ts                      → authentification crumb/cookie Yahoo
-  http.ts                            → fetch avec délai maximal
-  concurrency.ts                      → limiteur de requêtes parallèles
-  useFavoris.ts                         → hook favoris (localStorage)
+  tickers.ts                → les deux univers (SBF120, SP500) + registre UNIVERSS
+  format.ts                   → formatage prix/volume, gère plusieurs devises
+  plages.ts                     → périodes disponibles pour les graphiques
+  score.ts                       → types et lettre du score (S/A/B/C/D/F)
+  scoreCategoriel.ts               → calcul du score à 4 catégories, seuils fixes
+  fondamentaux.ts                    → récupération des données fondamentales Yahoo
+  yahooChart.ts                        → récupération et calcul des cours Yahoo
+  yahooAuth.ts                          → authentification crumb/cookie Yahoo
+  http.ts                                → fetch avec délai maximal
+  concurrency.ts                          → limiteur de requêtes parallèles
+  useFavoris.ts                             → hook favoris (localStorage)
 ```
 
 ## Ajuster les seuils de notation
@@ -190,14 +207,16 @@ Les seuils des 5 paliers (Très bon à Très faible) pour chacune des 18
 métriques sont définis dans `lib/scoreCategoriel.ts` (constantes
 `RENTABILITE`, `GESTION`, `CROISSANCE`, `SANTE_FINANCIERE`). Ils ont été
 calibrés à dire d'expert, sans méthodologie propriétaire de référence à
-reproduire — ajustez-les librement selon votre propre lecture de ce qui
-constitue une bonne performance pour chaque indicateur.
+reproduire, et sont **identiques pour le SBF 120 et le S&P 500** —
+ajustez-les librement.
 
 ## Ajuster l'univers de valeurs
 
-Éditez le tableau `UNIVERS` dans `lib/tickers.ts` (nom, ticker Yahoo
-Finance au format `XXX.PA`, secteur, siège social) pour
-ajouter, retirer ou corriger une valeur.
+Éditez `lib/tickers.ts` : le tableau `SBF120` ou `SP500` (nom, ticker
+Yahoo Finance, secteur, siège social) pour ajouter, retirer ou corriger
+une valeur. Le registre `UNIVERSS` en bas de fichier regroupe les deux
+univers avec leur indice de référence — inutile d'y toucher pour de
+simples ajustements de liste.
 
 ## Si les cours ou le score ne se chargent plus
 
@@ -211,6 +230,9 @@ et peuvent occasionnellement changer de comportement.
   bloqué — le reste du site continue de fonctionner.
 - Si une valeur précise reste vide en permanence (cours et score), voir
   la section sur la fiabilité des tickers plus haut.
+- Si le S&P 500 échoue systématiquement alors que le SBF 120 fonctionne,
+  c'est probablement un problème d'échelle (timeout ou blocage Yahoo) —
+  voir la section Performance plus haut.
 - En solution de repli pour les données fondamentales, vous pouvez adapter
   `lib/fondamentaux.ts` pour utiliser un fournisseur avec clé d'API
   gratuite, par exemple [Financial Modeling Prep](https://financialmodelingprep.com),

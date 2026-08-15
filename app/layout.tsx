@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "BELOSCORE — Screener PEA (SBF 120)",
+  title: "BELOSCORE — Screener SBF 120 / S&P 500",
   description:
-    "Screener des valeurs du SBF 120 éligibles au PEA avec score Value/Qualité, cours en temps différé, filtrable par secteur.",
+    "Screener des valeurs du SBF 120 et du S&P 500 avec score en 4 catégories (Rentabilité, Gestion, Croissance, Santé financière), cours en temps différé, filtrable par secteur.",
 };
 
 export default function RootLayout({
