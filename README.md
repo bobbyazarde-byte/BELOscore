@@ -81,7 +81,8 @@ Vercel Pro, ou migrer vers un fournisseur de données payant).
   navigateur via localStorage) et filtre le tableau dessus
 - Page détail par valeur : graphique interactif sur 6 périodes (1 jour,
   5 jours, 1 mois, YTD, 1 an, 5 ans) avec performance affichée sur la
-  période sélectionnée, fiche complète des 4 catégories de métriques
+  période sélectionnée, statistiques (dont le PER) et fiche complète des
+  4 catégories de métriques
 - Comparateur : sélectionne jusqu'à 3 valeurs (cases à cocher) pour les
   superposer en performance relative (base 100) — fonctionne même en
   mélangeant une valeur française et une valeur américaine
@@ -105,21 +106,46 @@ Vercel Pro, ou migrer vers un fournisseur de données payant).
 
 ## Performance et fiabilité à cette échelle
 
-- Les requêtes sont envoyées avec une **limite de concurrence** (15 en
+- **Cache des données fondamentales (6h)** : le plus gros levier. Les
+  marges, ratios et bilans ne changent qu'au rythme des publications
+  trimestrielles — inutile de les redemander à Yahoo à chaque
+  chargement. Le cache de données Next.js/Vercel les garde 6h,
+  **partagé entre tous les visiteurs** : la première personne qui charge
+  une valeur alimente le cache, tout le monde en profite ensuite. Ça
+  réduit à la fois le temps de chargement et le volume réel de requêtes
+  envoyées à Yahoo (donc le risque de blocage).
+- **Cache des cours (60s)** : évite de refaire la même requête si
+  plusieurs visiteurs chargent la page à quelques secondes d'intervalle,
+  sans donner l'impression de cours figés.
+- **Nouvelle tentative automatique** : si une requête de données
+  fondamentales échoue, le serveur force une nouvelle session
+  (cookie + jeton) et retente une fois avant d'abandonner — récupère les
+  échecs dus à une session périmée plutôt que d'afficher "—" à tort.
+- **Repli sur les données trimestrielles** : si le bilan ou les flux de
+  trésorerie annuels sont absents chez Yahoo pour une valeur, les
+  versions trimestrielles (plus systématiquement peuplées) prennent le
+  relais automatiquement.
+- **Bornes de plausibilité élargies** : les seuils qui écartent les
+  données corrompues (voir plus bas) ont été volontairement resserrés
+  uniquement là où un cas de corruption réel a été identifié (le PER) et
+  élargis partout ailleurs, pour ne plus écarter à tort des valeurs
+  réelles mais extrêmes (hypercroissance, forte dette, redressement).
+- Les requêtes sont envoyées avec une **limite de concurrence** (20 en
   parallèle, voir `lib/concurrency.ts`) plutôt que toutes en même temps,
   pour réduire le risque que Yahoo bloque l'accès comme trafic suspect.
-- Le rafraîchissement automatique de la page d'accueil est espacé à
-  **5 minutes** — le bouton "Actualiser" reste disponible pour un
-  rafraîchissement manuel immédiat.
+- **Pas de rafraîchissement automatique** : les cours ne se rechargent
+  que lors du tout premier affichage d'un univers, ou d'un clic explicite
+  sur "Actualiser". Un cache navigateur (sessionStorage, par onglet) garde
+  les dernières données affichées : revenir sur la page d'accueil depuis
+  une page détail ne redéclenche pas un chargement complet — l'horodatage
+  "Mis à jour à…" indique toujours l'ancienneté des données affichées.
 - La route `/api/quotes` est configurée avec `maxDuration = 300` secondes.
-- Le score étant calculé par seuils fixes (pas de comparaison aux pairs),
-  ouvrir une page détail ou le comparateur ne déclenche qu'un seul appel
-  Yahoo par valeur pour les données fondamentales.
 
 **Si le chargement échoue ou est trop lent en pratique**, plusieurs
 options, de la plus simple à la plus lourde :
 1. Rester sur le SBF 120 pour un usage quotidien, et n'utiliser le S&P
-   500 qu'occasionnellement.
+   500 qu'occasionnellement — le cache 6h rend les visites suivantes
+   nettement plus rapides que la toute première.
 2. Réduire `CONCURRENCE` dans `app/api/quotes/route.ts` (moins de requêtes
    simultanées, plus lent mais plus discret).
 3. Retirer des valeurs de `lib/tickers.ts` pour réduire l'univers S&P 500

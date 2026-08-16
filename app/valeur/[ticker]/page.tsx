@@ -72,6 +72,7 @@ export default function PageValeur() {
   const [points, setPoints] = useState<DetailValeur | null>(null);
   const [cotation, setCotation] = useState<CotationBase | null>(null);
   const [score, setScore] = useState<ScoreCategoriel | null>(null);
+  const [peRatio, setPeRatio] = useState<number | null>(null);
   const [chargementGraphique, setChargementGraphique] = useState(true);
   const [chargementFiche, setChargementFiche] = useState(true);
   const [erreur, setErreur] = useState(false);
@@ -110,6 +111,7 @@ export default function PageValeur() {
         if (annule) return;
         setCotation(cot as CotationBase);
         setScore((fond?.score as ScoreCategoriel) ?? null);
+        setPeRatio(fond?.fondamentaux?.peRatio ?? null);
         if (cot?.erreur) setErreur(true);
       })
       .catch(() => {
@@ -250,8 +252,9 @@ export default function PageValeur() {
             { label: "Plus bas (52 sem.)", val: formatPrix(cotation?.plusBas52s, cotation?.devise) },
             { label: "Volume", val: formatVolume(cotation?.volume) },
             { label: "Clôture veille", val: formatPrix(cotation?.clotureVeille, cotation?.devise) },
+            { label: "PER (cours/bénéfice)", val: peRatio !== null ? `${peRatio.toFixed(2)}x` : "—" },
             { label: "Secteur", val: valeur?.secteur ?? "—" },
-            { label: "Code Euronext", val: valeur?.mnemo ?? "—" },
+            { label: "Code", val: valeur?.mnemo ?? "—" },
             { label: "Siège social", val: valeur?.siege ?? "—" },
           ].map((s) => (
             <div

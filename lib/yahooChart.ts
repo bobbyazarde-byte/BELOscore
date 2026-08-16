@@ -60,7 +60,12 @@ export async function fetchYahooChart(
       url,
       {
         headers: { "User-Agent": USER_AGENT, Accept: "application/json" },
-        cache: "no-store",
+        // Cache très court (60s) : évite de refaire la même requête à
+        // Yahoo si plusieurs visiteurs chargent la page à quelques
+        // secondes d'intervalle, sans donner l'impression de cours figés
+        // (le bouton "Actualiser" et le rafraîchissement automatique
+        // restent réguliers).
+        next: { revalidate: 60 },
       },
       8000
     );

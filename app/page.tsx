@@ -12,6 +12,31 @@ import { formatPrix, formatVolume } from "@/lib/format";
 
 const MAX_COMPARATEUR = 3;
 const CLE_UNIVERS = "beloscore-univers";
+const PREFIXE_CACHE_COTATIONS = "beloscore-quotes-";
+
+interface DonneesCache {
+  cotations: Record<string, Cotation>;
+  indice: Cotation | null;
+  misAJour: string;
+}
+
+function lireCacheCotations(univers: CodeUnivers): DonneesCache | null {
+  try {
+    const brut = window.sessionStorage.getItem(PREFIXE_CACHE_COTATIONS + univers);
+    return brut ? (JSON.parse(brut) as DonneesCache) : null;
+  } catch {
+    return null;
+  }
+}
+
+function ecrireCacheCotations(univers: CodeUnivers, data: DonneesCache) {
+  try {
+    window.sessionStorage.setItem(PREFIXE_CACHE_COTATIONS + univers, JSON.stringify(data));
+  } catch {
+    // sessionStorage indisponible ou plein : on continue simplement sans
+    // cache, le prochain chargement referea un appel réseau normal.
+  }
+}
 
 type Colonne =
   | "nom"
@@ -107,6 +132,11 @@ export default function Page() {
       setCotations(map);
       setIndice(data.index ?? null);
       setMisAJourLe(new Date(data.updatedAt));
+      ecrireCacheCotations(univers, {
+        cotations: map,
+        indice: data.index ?? null,
+        misAJour: data.updatedAt,
+      });
     } catch (e) {
       setErreurGlobale(
         "Impossible de récupérer les cours pour le moment. Réessayez dans quelques instants."
@@ -118,15 +148,22 @@ export default function Page() {
 
   useEffect(() => {
     if (!universPret) return;
-    charger();
-    // Rafraîchissement automatique toutes les 5 minutes — le S&P 500
-    // pouvant représenter jusqu'à ~1000 requêtes Yahoo par rafraîchissement,
-    // un intervalle plus long évite de solliciter Yahoo trop fréquemment.
-    // Le bouton "Actualiser" reste disponible pour un rafraîchissement
-    // manuel immédiat.
-    const id = setInterval(charger, 5 * 60_000);
-    return () => clearInterval(id);
-  }, [charger, universPret]);
+    // On ne recharge automatiquement que s'il n'existe aucune donnée en
+    // cache pour cet univers dans cette session de navigation — sinon on
+    // affiche instantanément les dernières données connues (avec leur
+    // horodatage) plutôt que de refaire tout le tableau à chaque retour
+    // sur la page. Le chargement des cours ne se déclenche donc qu'au
+    // tout premier affichage d'un univers, ou via le bouton "Actualiser".
+    const cache = lireCacheCotations(univers);
+    if (cache) {
+      setCotations(cache.cotations);
+      setIndice(cache.indice);
+      setMisAJourLe(new Date(cache.misAJour));
+      setChargement(false);
+    } else {
+      charger();
+    }
+  }, [univers, universPret, charger]);
 
   const valeursUnivers = UNIVERSS[univers].valeurs;
   const secteurs = useMemo(() => secteursPour(univers), [univers]);

@@ -1,8 +1,11 @@
 // L'endpoint "quoteSummary" (données fondamentales) de Yahoo Finance est
 // plus restrictif que l'endpoint "chart" (cours) : il exige un cookie de
-// session + un jeton "crumb" obtenus au préalable. On les récupère une
-// fois et on les met en cache en mémoire (au niveau du module), valables
-// tant que l'instance serverless reste "chaude".
+// session + un jeton "crumb" obtenus au préalable. On les met en cache à
+// deux niveaux : en mémoire pour la durée de vie de l'instance serverless
+// (rapide, mais perdu à chaque instance froide), et via le cache de
+// données de Next.js/Vercel (persiste entre invocations et entre
+// utilisateurs, ce qui évite de refaire cette poignée de main à chaque
+// chargement de page).
 
 import { fetchAvecDelai } from "@/lib/http";
 
@@ -21,7 +24,11 @@ async function obtenirCookie(): Promise<string | null> {
   try {
     const res = await fetchAvecDelai(
       "https://fc.yahoo.com",
-      { headers: { "User-Agent": USER_AGENT }, redirect: "manual" },
+      {
+        headers: { "User-Agent": USER_AGENT },
+        redirect: "manual",
+        next: { revalidate: 900 },
+      },
       6000
     );
     if (!res) return null;
@@ -32,8 +39,8 @@ async function obtenirCookie(): Promise<string | null> {
   }
 }
 
-export async function obtenirSession(): Promise<Session | null> {
-  if (sessionEnCache && sessionEnCache.expireLe > Date.now()) {
+export async function obtenirSession(forceNouvelle = false): Promise<Session | null> {
+  if (!forceNouvelle && sessionEnCache && sessionEnCache.expireLe > Date.now()) {
     return sessionEnCache;
   }
 
@@ -43,7 +50,10 @@ export async function obtenirSession(): Promise<Session | null> {
   try {
     const res = await fetchAvecDelai(
       "https://query2.finance.yahoo.com/v1/test/getcrumb",
-      { headers: { "User-Agent": USER_AGENT, Cookie: cookie } },
+      {
+        headers: { "User-Agent": USER_AGENT, Cookie: cookie },
+        next: { revalidate: 900 },
+      },
       6000
     );
     if (!res || !res.ok) return null;

@@ -16,8 +16,12 @@ export const maxDuration = 300;
 
 // Nombre de requêtes Yahoo envoyées en parallèle. Un nombre trop élevé
 // risque de faire bloquer l'accès par Yahoo (rafale suspecte) ; un nombre
-// trop bas rend le chargement très lent. 15 est un compromis raisonnable.
-const CONCURRENCE = 15;
+// trop bas rend le chargement très lent. Les données fondamentales étant
+// désormais mises en cache 6h (voir lib/fondamentaux.ts), l'essentiel du
+// volume de requêtes ne se produit qu'une fois par valeur toutes les 6h
+// (tous utilisateurs confondus) plutôt qu'à chaque chargement — on peut
+// se permettre une concurrence un peu plus généreuse.
+const CONCURRENCE = 20;
 
 export interface Cotation extends CotationBase {
   score: ScoreCategoriel | null;
